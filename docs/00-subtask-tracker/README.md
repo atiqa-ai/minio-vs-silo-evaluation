@@ -3,7 +3,7 @@
 | ID   | Jira   | Subtask                                                      | Status      | Required Output                             |
 | ---- | ------ | ------------------------------------------------------------ | ----------- | ------------------------------------------- |
 | ST01 | DEV-905 | Set up repo, pin versions and build local Docker Compose lab | Complete   | Working local Compose lab                   |
-| ST02 | DEV-906 | Seed test data and build verification toolkit                | Not Started | Synthetic data + manifest toolkit           |
+| ST02 | DEV-906 | Seed test data and build verification toolkit                | In Progress | Synthetic data + manifest toolkit           |
 | ST03 | DEV-907 | MinIO feature validation                                     | Not Started | MinIO feature baseline                      |
 | ST04 | DEV-910 | MinIO performance baseline: local versus NFS-backed storage  | Not Started | MinIO performance baseline                  |
 | ST05 | DEV-908, DEV-909 | MinIO distributed mode: resilience, healing and expansion | Not Started | Distributed behavior + replication evidence |
