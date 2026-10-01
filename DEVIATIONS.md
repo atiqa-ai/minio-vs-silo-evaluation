@@ -13,24 +13,44 @@ Status values: `Approved` (agreed with the requester before acting) or
 
 ---
 
-## D-001 — No public repository
+## D-001 — No public repository *(RESOLVED 2026-10-01)*
 
 | Field | Value |
 |---|---|
 | Affects | ST01 completion requirement "Public repository created" |
-| Status | Approved |
-| Decision | Keep the repository local at `/home/devops/Documents/minio-vs-silo-evaluation`. Do not push. |
+| Status | Resolved |
+| Original decision | Keep the repository local at `/home/devops/Documents/minio-vs-silo-evaluation`. Do not push. |
+| Reversed | 2026-10-01, on request: the repository is now published. |
 
-**Reason.** The requester directed that the repository be set up locally and not
-pushed.
+**Original reason.** The requester directed that the repository be set up locally
+and not pushed.
 
-**Effect.** The ST01 completion checklist item "Public repository created"
-cannot be satisfied. All other ST01 requirements are met. Version control is
-still in place — the repository is a normal Git repository with a committed
-history, so it can be pushed to a public host at any time without changing the
-content.
+**Effect as originally recorded.** The ST01 completion checklist item "Public
+repository created" could not be satisfied. All other ST01 requirements were
+met. Version control was still in place — a normal Git repository with a
+committed history, pushable to a public host without changing content.
 
-**Mitigation.** A remote has not been configured. The history is local-only.
+**Resolution.** The requester subsequently directed strict compliance with the
+supplied SRD, which requires a public GitHub repository (SRD section 12), commits
+made directly to `main`, and Jira keys in issue titles. This deviation is
+withdrawn and the requirement met:
+
+* Repository: `https://github.com/atiqa-ai/minio-vs-silo-evaluation` (public).
+* Branch: `main`.
+* The one pre-existing commit was rewritten so its author email is the GitHub
+  noreply address `230258577+atiqa-ai@users.noreply.github.com`, because SRD
+  section 13 forbids committing email addresses and Git stores the author email
+  in history.
+* Commit messages use the Jira key first, then the ST id, satisfying both SRD
+  section 12 and the Jira documentation rule.
+* The Jira epic `DEV-904` and subtasks `DEV-905` … `DEV-915` exist as GitHub
+  issues whose titles carry the Jira keys.
+
+**Residual gap.** SRD section 12 also asks that the GitHub Project mirror the
+Jira subtasks. Issue titles are done; the issues are not attached to a GitHub
+Project board, because the SRD does not define one and guardrail 1 forbids
+turning a general best practice into a project requirement. Recorded here rather
+than silently omitted.
 
 ---
 
@@ -285,3 +305,66 @@ tested. It is recorded because it is a plausible contributor to any throughput
 difference observed in ST08, and attributing such a difference purely to "Silo
 is faster or slower" would be unsound. Any ST08 conclusion must state which Go
 runtime produced it.
+
+---
+
+## D-012 — Execution order follows the SRD, not the Jira key order
+
+| Field | Value |
+|---|---|
+| Affects | ST04, ST05 |
+| Status | Approved |
+
+**Reason.** The supplied Jira reference (`docs/00-srd/jira-reference.md`) numbers
+the subtasks in a different order from the SRD's `ST01`–`ST10`. Two differences
+matter:
+
+| Subject | Jira | SRD |
+|---|---|---|
+| MinIO replication | separate subtask `DEV-909` | folded into ST05 |
+| MinIO performance baseline | `DEV-910`, listed *after* `DEV-909` | `ST04`, *before* `ST05` |
+
+The Jira execution sequence is `DEV-905 → … → DEV-908 → DEV-909 → DEV-910 → …`,
+which runs replication before performance. The SRD requires
+`ST04 (performance) → ST05 (distributed mode, which includes replication)`.
+
+**What was done instead.** The SRD execution order is authoritative, so ST04 is
+executed before ST05. Guardrail 29 states that the approved SRD takes priority
+over model suggestions and general practice, and guardrail 1 forbids changing
+the project's testing methodology without a documented requirement. The Jira
+document is used as a **tracking map**: `DEV-905`–`DEV-915` identify work, and
+every commit, issue and subtask README cites its Jira key, but the ST sequence
+decides what runs when.
+
+**Effect.** The repository's folder structure and execution order remain exactly
+as SRD section 10 defines them. Replication (`DEV-909`) is covered inside
+`docs/05-minio-distributed-mode/` beside `DEV-908`, because adding a folder for it
+would add structure the SRD does not define (guardrail 17). No test, evidence
+item or result changes; only the order in which the same work is scheduled
+differs from the Jira ticket numbering.
+
+---
+
+## D-013 — `DEV-907` executed on the distributed profile, not single node
+
+| Field | Value |
+|---|---|
+| Affects | ST03 |
+| Status | Approved |
+
+**Reason.** The Jira reference titles `DEV-907` "MinIO feature validation (single
+node)". The SRD's ST03 says only "MinIO feature validation" and specifies no
+node count, while SRD section 5 makes a 4-node cluster plus a load-balancer
+container the reference Profile B topology. The SRD therefore both fixes the
+topology and stays silent on node count.
+
+**What was done instead.** ST03 runs against the Profile B 4 nodes x 1 drive
+cluster. Guardrail 1 forbids turning a Jira title into a project requirement the
+SRD does not state, and SRD section 5 is the higher authority on topology.
+
+**Effect.** Feature results (versioning, object lock, lifecycle, core S3
+operations) are validated on the distributed topology the SRD mandates. They are
+*not* separately validated against a single-node MinIO deployment, so ST03's
+evidence does not demonstrate single-node behaviour. This is restated in
+`docs/03-minio-feature-validation/README.md` so it cannot be read as coverage that
+was never performed.

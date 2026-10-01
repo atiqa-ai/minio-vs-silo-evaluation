@@ -36,7 +36,8 @@ lab/compose/.env
 # Cluster data and runtime state
 # ---------------------------------------------------------------------------
 # MinIO and Silo write as root inside these bind mounts, so cleanup needs a
-# container (see the ST12 runbook) rather than a host rm.
+# container (see the Cleanup section of
+# docs/01-repository-and-lab/README.md) rather than a host rm.
 lab/data/
 lab/logs/
 

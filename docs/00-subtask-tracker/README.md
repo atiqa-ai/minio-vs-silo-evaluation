@@ -1,17 +1,47 @@
 # Subtask Tracker
 
-| ID   | Subtask                                                      | Status      | Required Output                             |
-| ---- | ------------------------------------------------------------ | ----------- | ------------------------------------------- |
-| ST01 | Set up repo, pin versions and build local Docker Compose lab | Complete   | Working local Compose lab                   |
-| ST02 | Seed test data and build verification toolkit                | Not Started | Synthetic data + manifest toolkit           |
-| ST03 | MinIO feature validation                                     | Not Started | MinIO feature baseline                      |
-| ST04 | MinIO performance baseline: local versus NFS-backed storage  | Not Started | MinIO performance baseline                  |
-| ST05 | MinIO distributed mode: resilience, healing and expansion    | Not Started | Distributed behavior + replication evidence |
-| ST06 | Silo functional validation                                   | Not Started | Silo functional results                     |
-| ST07 | S3 and client compatibility diff                             | Not Started | Compatibility comparison + O01–O08          |
-| ST08 | Benchmark Silo and compare with MinIO baseline               | Not Started | Performance comparison                      |
-| ST09 | Security, licensing, maintenance and CVE review              | Not Started | Security/licensing/maintenance review       |
-| ST10 | Capability matrix, evaluation report and recommendation      | Not Started | Final matrix + evaluation                   |
+| ID   | Jira   | Subtask                                                      | Status      | Required Output                             |
+| ---- | ------ | ------------------------------------------------------------ | ----------- | ------------------------------------------- |
+| ST01 | DEV-905 | Set up repo, pin versions and build local Docker Compose lab | Complete   | Working local Compose lab                   |
+| ST02 | DEV-906 | Seed test data and build verification toolkit                | Not Started | Synthetic data + manifest toolkit           |
+| ST03 | DEV-907 | MinIO feature validation                                     | Not Started | MinIO feature baseline                      |
+| ST04 | DEV-910 | MinIO performance baseline: local versus NFS-backed storage  | Not Started | MinIO performance baseline                  |
+| ST05 | DEV-908, DEV-909 | MinIO distributed mode: resilience, healing and expansion | Not Started | Distributed behavior + replication evidence |
+| ST06 | DEV-911 | Silo functional validation                                   | Not Started | Silo functional results                     |
+| ST07 | DEV-912 | S3 and client compatibility diff                             | Not Started | Compatibility comparison + O01–O08          |
+| ST08 | DEV-913 | Benchmark Silo and compare with MinIO baseline               | Not Started | Performance comparison                      |
+| ST09 | DEV-914 | Security, licensing, maintenance and CVE review              | Not Started | Security/licensing/maintenance review       |
+| ST10 | DEV-915 | Capability matrix, evaluation report and recommendation      | Not Started | Final matrix + evaluation                   |
+
+Main epic: `DEV-904`. Jira reference: `docs/00-srd/jira-reference.md`.
+
+> **The ST sequence above is the execution order, not the Jira key order.**
+> The supplied Jira reference lists `DEV-905 … DEV-915` in a different order:
+> it runs replication (`DEV-909`) and then performance (`DEV-910`), whereas the
+> SRD runs ST04 performance before ST05 distributed mode. The SRD takes priority
+> (guardrail 29), so ST04 precedes ST05. The Jira document is used as a
+> **tracking map**, not as an execution plan. See `DEVIATIONS.md` D-012.
+
+---
+
+# ST-to-Jira Mapping Notes
+
+* **`DEV-909` has no separate `docs/NN-name/` folder.** The SRD's documentation
+  structure (SRD section 10) fixes the folder list, and replication is part of
+  the SRD's Subtask 5. Replication is therefore covered inside
+  `docs/05-minio-distributed-mode/` and cited there as `DEV-909`, next to
+  `DEV-908`. Creating an extra folder would add structure the SRD does not define
+  (guardrail 17).
+* **`DEV-907` is titled "(single node)" in Jira, but is executed on the SRD's
+  Profile B 4 nodes x 1 drive cluster.** SRD section 5 defines the reference
+  topology as a 4-node cluster with a load-balancer container, and SRD ST03 says
+  nothing about node count. Guardrail 1 forbids turning a Jira title into a
+  requirement the SRD does not state, so the distributed profile is used and the
+  difference is recorded in `docs/03-minio-feature-validation/README.md`.
+* **Commit messages use the Jira key first, then the ST id**, for example
+  `DEV-906: ST02 seed test data and build the verification toolkit`. This
+  satisfies SRD section 12 (commit messages start with the subtask number) and
+  the Jira documentation rule simultaneously.
 
 ---
 
