@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+# capture-manifest - read a seeded bucket back from the server and emit one JSON
+# object per key with all seven fields the ST02 manifest must carry.
+#
+# Guardrail 11 (Identical-Test Rule): the same script and the same client binary
+# run against MinIO and against Silo, so the only variable between the two runs
+# is the storage backend. Nothing here interprets the result; comparison is
+# verify-manifest's job.
+#
+# Two of the seven fields cannot come from the local generator:
+#
+#   Version ID  server-assigned. Absent locally, so it is read back from the
+#               server. TC-ST02-02 fails if any object has an empty Version ID.
+#   Checksum    the generator records both SHA-256 and MD5, but the server
+#               reports only the S3 ETag, which for these objects is the MD5.
+#               ETag is captured as-is and compared against the local MD5; a
+#               non-MD5 ETag (multipart or encrypted) would surface as a
+#               mismatch rather than being quietly accepted.
+#
+# Usage: tools/bin/capture-manifest <minio|silo> <bucket>
+#
+# Writes JSON Lines to stdout so it can be redirected straight into evidence/.
+
+set -euo pipefail
+
+PRODUCT="${1:-}"
+BUCKET="${2:-}"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+case "$PRODUCT" in
+  minio) CLIENT=mc-client ;;
+  silo)  CLIENT=silo-client ;;
+  *) echo "usage: $0 <minio|silo> <bucket>" >&2; exit 2 ;;
+esac
+[ -n "$BUCKET" ] || { echo "usage: $0 <minio|silo> <bucket>" >&2; exit 2; }
+
+# Same guard as seed-dataset: refuse to run against an alias that does not
+# resolve to a network endpoint, because mc would silently fall back to a
+# filesystem client and "capture" local files instead of the bucket.
+endpoint=""
+for line in $(docker exec "$CLIENT" mc alias list "$PRODUCT" 2>/dev/null); do
+  case "$line" in
+    *http://*|*https://*) endpoint="$line"; break ;;
+  esac
+done
+if [ -z "$endpoint" ]; then
+  echo "ABORT: alias '$PRODUCT' does not resolve to an http(s) endpoint in $CLIENT." >&2
+  exit 1
+fi
+ALIAS="$PRODUCT/$BUCKET"
+
+# --recursive --json gives key, size, etag, lastModified and versionID for every
+# object in one pass. Tags and retention are NOT included by mc ls, so each
+# object is stat-ed individually for those two fields inside the container.
+# Doing it here rather than per-object from the host keeps it to one exec.
+docker exec -i "$CLIENT" bash -s -- "$PRODUCT" "$BUCKET" <<'INNER'
+set -uo pipefail
+ALIAS="$1"; BUCKET="$2"
+
+# The client images ship no python or jq, so JSON is parsed with sed. Both
+# commands used here emit ONE compact JSON object per line, which is what makes
+# line-oriented parsing safe:
+#
+#   mc stat --json <key>       -> 1 line (verified: wc -l == 1)
+#   mc ls --recursive --json   -> 1 object per line
+#
+# If a future mc release switches stat to pretty-printed multi-line output, the
+# seds below would silently yield empty fields instead of failing loudly. The
+# empty-field check in verify-manifest is what catches that, so it is a
+# detectable failure rather than a silent one.
+mc ls --recursive --json "$ALIAS" 2>/dev/null | while IFS= read -r line; do
+  [ -n "$line" ] || continue
+  name=$(printf '%s' "$line" | sed -n 's/.*"key":"\([^"]*\)".*/\1/p')
+  [ -n "$name" ] || continue
+  size=$(printf '%s' "$line" | sed -n 's/.*"size":\([0-9]*\).*/\1/p')
+  etag=$(printf '%s' "$line" | sed -n 's/.*"etag":"\([^"]*\)".*/\1/p')
+  vid=$(printf '%s'  "$line" | sed -n 's/.*"versionId":"\([^"]*\)".*/\1/p')
+  lm=$(printf '%s'   "$line" | sed -n 's/.*"lastModified":"\([^"]*\)".*/\1/p')
+
+  # stat for tags (X-Amz-Tagging-Count only proves a count) and retention mode.
+  stat=$(mc stat --json "$ALIAS/$name" 2>/dev/null)
+  mode=$(printf '%s' "$stat" | sed -n 's/.*"X-Amz-Object-Lock-Mode":"\([^"]*\)".*/\1/p')
+  until=$(printf '%s' "$stat" | sed -n 's/.*"X-Amz-Object-Lock-Retain-Until-Date":"\([^"]*\)".*/\1/p')
+  tags=$(mc tag list "$ALIAS/$name" 2>/dev/null | sed -n 's/^[[:space:]]*//p' | paste -sd'&' -)
+
+  # Custom metadata only: drop Content-Type and the X-Amz-Object-Lock-* headers,
+  # which are not user metadata and would otherwise show up as spurious diffs.
+  meta=$(printf '%s' "$stat" \
+    | sed -n 's/.*"X-Amz-Meta-\([A-Za-z0-9-]*\)":"\([^"]*\)".*/\1=\2/p' \
+    | paste -sd';' -)
+
+  # Hand-rolled JSON emission. The values are all mc-generated and contain no
+  # quotes or backslashes beyond what sed already stripped, and every field is
+  # emitted as a string so an empty value stays visible as "" rather than
+  # vanishing and being mistaken for absent.
+  printf '{"key":"%s","size":"%s","etag":"%s","versionId":"%s","lastModified":"%s","tags":"%s","metadata":"%s","retentionMode":"%s","retentionUntil":"%s"}\n' \
+    "$name" "${size:-}" "${etag:-}" "${vid:-}" "${lm:-}" "${tags:-}" "${meta:-}" "${mode:-}" "${until:-}"
+done
+INNER

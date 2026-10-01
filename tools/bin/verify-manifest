@@ -1,0 +1,208 @@
+#!/usr/bin/env bash
+# verify-manifest - compare a server-captured manifest against the local
+# ground-truth manifest and print one line per mismatch.
+#
+# Guardrail 11 (Identical-Test Rule): run once per product with the identical
+# script, then diff the two outputs. A field that differs between MinIO and Silo
+# is itself a result, not a defect of this tool.
+#
+# Seven fields are compared, per the ST02 manifest definition:
+#
+#   key        must be present on both sides, and no extra/missing keys
+#   size       must match exactly
+#   checksum   server ETag vs local MD5 (Etag == MD5 for these objects)
+#   versionId  must be NON-EMPTY (server-assigned; TC-ST02-02 fails otherwise)
+#   tags       set equality, order-insensitive
+#   metadata   key/value set equality after normalising the header prefix
+#   retention  mode must match; days are compared, not the absolute date,
+#              because "retain until" is a wall-clock instant that shifts
+#              between the seed run and the capture run
+#
+# Usage: tools/bin/verify-manifest <minio|silo> <bucket> [local-manifest]
+#
+# Exit status: 0 all objects match, 1 at least one mismatch, 2 bad usage.
+
+set -uo pipefail
+
+PRODUCT="${1:-}"
+BUCKET="${2:-}"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+LOCAL="${3:-$ROOT/lab/data/dataset/dataset-manifest.jsonl}"
+
+case "$PRODUCT" in
+  minio) CLIENT=mc-client ;;
+  silo)  CLIENT=silo-client ;;
+  *) echo "usage: $0 <minio|silo> <bucket> [local-manifest]" >&2; exit 2 ;;
+esac
+[ -n "$BUCKET" ] || { echo "usage: $0 <minio|silo> <bucket>" >&2; exit 2; }
+[ -f "$LOCAL" ] || { echo "missing local manifest: $LOCAL" >&2; exit 2; }
+
+CAPTURED=$(mktemp)
+trap 'rm -f "$CAPTURED" "$CAPTURED.n"' EXIT
+
+echo "== capturing server manifest for $PRODUCT/$BUCKET"
+"$ROOT/tools/bin/capture-manifest" "$PRODUCT" "$BUCKET" > "$CAPTURED"
+echo "   captured $(wc -l < "$CAPTURED") objects from the server"
+echo "   local manifest has $(wc -l < "$LOCAL") objects"
+
+# The comparison runs on the host, where python3 exists. The client containers
+# have no python, which is why capture emits flat single-line JSON.
+python3 - "$LOCAL" "$CAPTURED" <<'PY'
+import json, sys
+
+local_path, server_path = sys.argv[1], sys.argv[2]
+
+
+def load(path):
+    out = {}
+    with open(path, encoding="utf-8") as fh:
+        for n, line in enumerate(fh, 1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError as exc:
+                # A truncated or non-JSON line means the capture side broke, and
+                # that must be loud rather than read as "field absent".
+                sys.stderr.write(f"FATAL {path}:{n}: not valid JSON: {exc}\n")
+                sys.exit(2)
+            out[row["key"]] = row
+    return out
+
+
+def norm_tags(value):
+    """Tags as a frozenset of pairs, order-insensitive."""
+    if not value:
+        return frozenset()
+    if isinstance(value, list):
+        return frozenset(value)
+    return frozenset(t for t in value.replace(";", "&").split("&") if t)
+
+
+def norm_meta(value):
+    """Metadata as a frozenset of pairs.
+
+    The local side is a dict of bare keys; the server side arrives as an
+    'X-Amz-Meta-Key=value' string, or already as a dict if a future mc emits it
+    that way. Both are normalised to (lower-cased key, value) pairs.
+    """
+    if not value:
+        return frozenset()
+    if isinstance(value, dict):
+        items = value.items()
+    else:
+        items = []
+        for pair in value.split(";"):
+            if "=" in pair:
+                k, v = pair.split("=", 1)
+                items.append((k, v))
+    return frozenset(
+        (k[len("X-Amz-Meta-"):] if k.lower().startswith("x-amz-meta-") else k, v)
+        for k, v in items
+    )
+
+
+def norm_retention_days(local_row, server_row):
+    """Retention days, derived server-side from the retain-until instant.
+
+    The server reports an absolute date, so the day count is recovered by
+    comparing it against the capture time rather than by trusting a stored
+    integer. Returns None when either side is absent, which is a mismatch.
+    """
+    until = server_row.get("retentionUntil") or ""
+    if not until:
+        return None
+    try:
+        import datetime as dt
+        # Truncate to whole days: '2026-10-08T20:41:19.000Z' -> 2026-10-08
+        d = dt.datetime.fromisoformat(until.replace("Z", "+00:00")).date()
+    except ValueError:
+        return None
+    return (d - dt.date.today()).days
+
+
+local = load(local_path)
+server = load(server_path)
+
+missing = sorted(set(local) - set(server))
+extra = sorted(set(server) - set(local))
+
+problems = 0
+if missing:
+    print(f"MISSING_ON_SERVER  {len(missing)} object(s) present locally but absent from the bucket")
+    for k in missing[:20]:
+        print(f"    {k}")
+    if len(missing) > 20:
+        print(f"    ... and {len(missing) - 20} more")
+    problems += len(missing)
+if extra:
+    print(f"EXTRA_ON_SERVER    {len(extra)} object(s) in the bucket but not in the local manifest")
+    for k in extra[:20]:
+        print(f"    {k}")
+    if len(extra) > 20:
+        print(f"    ... and {len(extra) - 20} more")
+    problems += len(extra)
+
+checked = 0
+for key in sorted(set(local) & set(server)):
+    l, s = local[key], server[key]
+
+    # --- size
+    if str(l.get("size", "")) != str(s.get("size", "")):
+        print(f"SIZE       {key}: local={l.get('size')} server={s.get('size')}")
+        problems += 1
+
+    # --- checksum: server ETag against local MD5
+    etag = (s.get("etag") or "").strip('"')
+    if etag.lower() != str(l.get("md5", "")).lower():
+        print(f"CHECKSUM   {key}: local_md5={l.get('md5')} server_etag={etag}")
+        problems += 1
+
+    # --- Version ID must be non-empty (TC-ST02-02)
+    if not s.get("versionId"):
+        print(f"VERSIONID  {key}: server returned an empty Version ID")
+        problems += 1
+
+    # --- tags
+    if norm_tags(l.get("tags")) != norm_tags(s.get("tags")):
+        print(f"TAGS       {key}: local={sorted(norm_tags(l.get('tags')))} "
+              f"server={sorted(norm_tags(s.get('tags')))}")
+        problems += 1
+
+    # --- metadata
+    if norm_meta(l.get("metadata")) != norm_meta(s.get("metadata")):
+        print(f"METADATA   {key}: local={sorted(norm_meta(l.get('metadata')))} "
+              f"server={sorted(norm_meta(s.get('metadata')))}")
+        problems += 1
+
+    # --- retention: mode exactly, days within a one-day tolerance
+    lmode = (l.get("retention_mode") or "").upper()
+    smode = (s.get("retentionMode") or "").upper()
+    if lmode != smode:
+        print(f"RETENTION  {key}: local_mode={lmode or '(none)'} server_mode={smode or '(none)'}")
+        problems += 1
+    else:
+        sdays = norm_retention_days(l, s)
+        ldays = l.get("retention_days")
+        if lmode:
+            if sdays is None:
+                print(f"RETENTION  {key}: server gave no usable retain-until date")
+                problems += 1
+            elif ldays is None or abs(sdays - int(ldays)) > 1:
+                print(f"RETENTION  {key}: local_days={ldays} server_days~{sdays}")
+                problems += 1
+    checked += 1
+
+print()
+print(f"VERIFY product=$PRODUCT bucket=$BUCKET")
+print(f"  objects checked : {checked}")
+print(f"  local total     : {len(local)}")
+print(f"  server total    : {len(server)}")
+print(f"  mismatches      : {problems}")
+if problems == 0:
+    print("  RESULT: PASS - all seven fields agree for every object")
+else:
+    print("  RESULT: FAIL - see the lines above")
+sys.exit(1 if problems else 0)
+PY

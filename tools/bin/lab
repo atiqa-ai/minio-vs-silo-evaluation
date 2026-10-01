@@ -14,6 +14,9 @@
 #   lab up workload        start the long-lived client containers
 #   lab up monitoring      start the metrics scraper (publishes no ports)
 #   lab down minio|silo|proxy|workload|monitoring
+#   lab wipe minio|silo    destroy one product's data directory, then recreate
+#                          the empty node dirs. Refuses while that cluster runs.
+#   lab restart-workload   recreate client containers so bind mounts refresh
 #   lab status             show what is running
 #   lab ps <product>       compose ps for one project
 
@@ -23,6 +26,11 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
 COMPOSE="$ROOT/lab/compose"
 ENV_FILE="$COMPOSE/.env"
+
+# Pin by digest, taken from the image the cluster node images are built FROM, so
+# `wipe` never depends on a floating tag resolving. ubi-micro is 32 MB and
+# already pulled, so this adds no meaningful disk cost.
+UBI_MICRO="registry.access.redhat.com/ubi9/ubi-micro@sha256:932aec77f5b86a5dba854a18b14a38725b296967e7dc9c7a1f4d7f0bf82e1ce5"
 
 die() { printf 'lab: %s\n' "$*" >&2; exit 1; }
 say() { printf '\n== %s ==\n' "$*"; }
@@ -37,7 +45,8 @@ project_for() {
     proxy)     echo proxy ;;
     workload)  echo workload ;;
     monitoring) echo monitoring ;;
-    *)         die "unknown target '$1' (expected minio|silo|proxy|workload|monitoring)" ;;
+    restart-workload) echo workload ;;
+    *)         die "unknown target '$1' (expected minio|silo|proxy|workload|monitoring|restart-workload)" ;;
   esac
 }
 
@@ -119,6 +128,62 @@ case "${1:-}" in
     # Guardrails 20: refuse to remove data volumes. Cluster data lives in bind
     # mounts under lab/data, which Compose never owns, so no -v is ever passed.
     dc "$dir" down --remove-orphans
+    ;;
+
+  wipe)
+    target="${2:-}"
+    case "$target" in
+      minio) PRODUCT=minio;  PROJECT=minio-cluster ;;
+      silo)  PRODUCT=silo;   PROJECT=silo-cluster ;;
+      *) die "usage: lab wipe <minio|silo>" ;;
+    esac
+    DATA="$ROOT/lab/data/$PRODUCT"
+    PARENT="$(dirname "$DATA")"
+
+    # Wiping under a live cluster would silently reformat on restart and lose
+    # the very evidence the wipe was meant to clear, so this refuses outright.
+    if [ -n "$(docker ps --filter "label=com.docker.compose.project=$PROJECT" -q)" ]; then
+      die "$PRODUCT cluster is running; 'lab down $PRODUCT' first"
+    fi
+
+say "wiping $DATA"
+    # The servers run as root and leave root-owned files inside the bind mount,
+    # and sudo needs interactive auth on this host (D-010). Deleting through a
+    # root container avoids both, needs no extra image (ubi-micro is 32 MB and
+    # already pulled), and --network none keeps it off the network entirely.
+    #
+    # The mount is on the PARENT directory, not on $DATA itself: that removes
+    # $DATA outright and it is then recreated below by the devops user, so the
+    # result is owned correctly instead of staying root-owned from the previous
+    # run.
+    docker run --rm --network none -v "$PARENT":/parent \
+      "$UBI_MICRO" \
+      sh -c "rm -rf '/parent/$(basename "$DATA")'"
+    for n in 1 2 3 4; do mkdir -p "$DATA/node-$n"; done
+    echo "  $DATA removed and recreated empty; node-1..4 owned by $(id -un)"
+    ;;
+
+  # Recreate the client containers so their bind mounts point at the current
+  # inode of the dataset directory.
+  #
+  # This is needed because gen-dataset and `lab wipe` delete and recreate
+  # lab/data/dataset and lab/data/<product>. A bind mount resolves to the inode
+  # that existed at mount time, so a container started earlier keeps serving the
+  # OLD directory after a delete-and-recreate: /dataset looks empty even though
+  # the host directory is full, and seeding "succeeds" with zero objects. That
+  # silent-empty-mount trap is worse than a visible error, so the fix lives here
+  # rather than as a habit of remembering to restart.
+  restart-workload)
+    say "recreating workload containers to refresh their bind mounts"
+    dc workload down --remove-orphans
+    dc workload up -d
+    sleep 3
+    dc workload ps
+    # Prove the refresh worked instead of assuming it.
+    for c in mc-client silo-client; do
+      printf '  %-13s sees %s dataset entries\n' "$c" \
+        "$(docker exec "$c" ls /dataset 2>/dev/null | wc -l)"
+    done
     ;;
 
   status)

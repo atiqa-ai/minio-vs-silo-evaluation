@@ -98,25 +98,50 @@ set -uo pipefail
 ALIAS="$1"; BUCKET="$2"; PRODUCT="$3"; EXPECTED="$4"
 PLAN=/dataset/seed-plan.tsv
 CONCURRENCY="${SEED_CONCURRENCY:-4}"
+RETRIES="${SEED_RETRIES:-4}"
 STATUS=/tmp/seed-status.txt
 FAILLOG=/tmp/seed-failures.txt
-: > "$STATUS"; : > "$FAILLOG"
+RETRYLOG=/tmp/seed-retries.txt
+: > "$STATUS"; : > "$FAILLOG"; : > "$RETRYLOG"
 
 upload_one() {
   local key="$1" meta="$2" tags="$3" mode="$4" days="$5"
-  local target="$ALIAS/$BUCKET/$key" err
-  if ! err="$(mc cp --quiet --attr "$meta" "/dataset/$key" "$target" 2>&1)"; then
-    printf 'UPLOAD\t%s\t%s\n' "$key" "$err" >> "$FAILLOG"; printf 'f\t%s\n' "$key" >> "$STATUS"; return
-  fi
-  # Tags are set after upload: mc cp accepts only one --tags flag, and repeating
-  # the flag silently keeps only the last value.
-  if ! err="$(mc tag set "$target" "$tags" 2>&1)"; then
-    printf 'TAG\t%s\t%s\n' "$key" "$err" >> "$FAILLOG"; printf 'f\t%s\n' "$key" >> "$STATUS"; return
-  fi
-  if ! err="$(mc retention set "$mode" "${days}d" "$target" 2>&1)"; then
-    printf 'RETENTION\t%s\t%s\n' "$key" "$err" >> "$FAILLOG"; printf 'f\t%s\n' "$key" >> "$STATUS"; return
-  fi
-  printf 's\t%s\n' "$key" >> "$STATUS"
+  local target="$ALIAS/$BUCKET/$key" err stage try
+
+  # Transient failures are real on this host and are NOT product behaviour.
+  # Observed while seeding 2409 objects at concurrency 4 on 4 vCPU:
+  #
+  #   "dial tcp: lookup minio-1: i/o timeout"
+  #       Docker's embedded DNS (127.0.0.11) briefly fails to answer under load.
+  #       Retried, it always succeeds on the first repeat.
+  #   "Remote bucket ... does not support locking"
+  #       mc momentarily resolved the bucket's lock capability as absent. The
+  #       same command on the same object then succeeded three times running,
+  #       so this is a client-side race, not a missing object-lock feature.
+  #
+  # A retry loop keeps these from being recorded as seeded objects that are
+  # actually incomplete. Persistent failures are still logged and still counted
+  # as failures; only the transient class is absorbed. Each retry is counted so
+  # the retry count appears in the seed summary instead of vanishing.
+  for try in $(seq 1 "$RETRIES"); do
+    if ! err="$(mc cp --quiet --attr "$meta" "/dataset/$key" "$target" 2>&1)"; then
+      stage=UPLOAD
+    # Tags are set after upload: mc cp accepts only one --tags flag, and
+    # repeating the flag silently keeps only the last value.
+    elif ! err="$(mc tag set "$target" "$tags" 2>&1)"; then
+      stage=TAG
+    elif ! err="$(mc retention set "$mode" "${days}d" "$target" 2>&1)"; then
+      stage=RETENTION
+    else
+      printf 's\t%s\n' "$key" >> "$STATUS"
+      [ "$try" -gt 1 ] && printf 'RETRY_OK\t%s\tstage=%s attempt=%d\n' "$key" "$stage" "$try" >> "$RETRYLOG"
+      return
+    fi
+    # Exponential-ish backoff; the DNS resolver needs a moment to recover.
+    sleep $(( try ))
+  done
+  printf '%s\t%s\t%s\n' "$stage" "$key" "$err" >> "$FAILLOG"
+  printf 'f\t%s\n' "$key" >> "$STATUS"
 }
 
 while IFS=$'\t' read -r key meta tags mode days; do
@@ -128,7 +153,13 @@ wait
 
 ok=$(while read -r c _; do [ "$c" = "s" ] && echo x; done < "$STATUS" | wc -l)
 bad=$(while read -r c _; do [ "$c" = "f" ] && echo x; done < "$STATUS" | wc -l)
-printf 'SEED_SUMMARY\tproduct=%s\texpected=%s\tok=%s\tfailed=%s\n' "$PRODUCT" "$EXPECTED" "$ok" "$bad"
+retried=$(wc -l < "$RETRYLOG")
+printf 'SEED_SUMMARY\tproduct=%s\texpected=%s\tok=%s\tfailed=%s\tretried=%s\tconcurrency=%s\tmax_retries=%s\n' \
+  "$PRODUCT" "$EXPECTED" "$ok" "$bad" "$retried" "$CONCURRENCY" "$RETRIES"
+if [ -s "$RETRYLOG" ]; then
+  printf -- '--- objects that needed a retry (transient errors, up to 20) ---\n'
+  head -20 "$RETRYLOG"
+fi
 if [ -s "$FAILLOG" ]; then
   printf -- '--- failures (up to 20) ---\n'
   head -20 "$FAILLOG"

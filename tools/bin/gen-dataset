@@ -6,17 +6,22 @@ data, and the generator reads no external input.
 
 Determinism matters more than realism. The Identical-Test Rule (guardrails 6)
 requires MinIO and Silo to be tested against the same test data. Rather than
-uploading one dataset twice and copying 2 GB through a network path that
+uploading one dataset twice and copying it through a network path that
 guardrails 11 forbids, both products are seeded from this generator, which
 produces byte-identical output on every run. That property is asserted, not
 assumed: --verify-deterministic regenerates a sample and compares digests.
+
+The dataset size is asserted too, not asserted in prose. --min-bytes (default:
+the Profile B 5 GiB floor) makes the generator exit non-zero when the realised
+dataset is smaller than required, so an undersized dataset can never be quietly
+described as compliant. This is what D-005 now enforces mechanically.
 
 Byte content comes from a SHA-256 counter-mode keystream, seeded from the object
 name. This keeps generation fast for large objects and guarantees no long runs of
 repeated or zero bytes, which would make compression behaviour unrepresentative.
 
 Usage:
-  gen-dataset --out DIR [--profile full|smoke]
+  gen-dataset --out DIR [--profile profileb|full|smoke] [--min-bytes N]
   gen-dataset --out DIR --verify-deterministic
 """
 
@@ -65,9 +70,10 @@ def object_bytes(keystream: bytes, key: str, size: int) -> bytes:
 # (prefix, count, size_spec, purpose)
 # size_spec: (min_bytes, max_bytes) chosen deterministically per index.
 PROFILES = {
-    # Full dataset. Total is computed and written to the manifest rather than
-    # assumed, because the actual total determines how long seeding takes and
-    # whether both datasets fit on the host alongside the images.
+    # Original full dataset. Retained so earlier runs stay reproducible: the
+    # 885.82 MiB it produces is under the Profile B floor, which is why
+    # `profileb` exists. Do not resize these entries in place, or previously
+    # recorded digests stop reproducing.
     "full": [
         ("small", 500, (4 * 1024, 64 * 1024), "small-object throughput and LIST depth"),
         ("medium", 100, (1024 * 1024, 1024 * 1024), "general mixed workload"),
@@ -77,6 +83,28 @@ PROFILES = {
         ("unicode/ünïcödé/δοκιμή", 12, (1 * 1024, 16 * 1024), "non-ASCII key handling"),
         ("special/chars with spaces+plus", 8, (1 * 1024, 8 * 1024), "key characters needing quoting"),
     ],
+    # Profile B: SRD profile B requires a 5-10 GB dataset. `full` realised only
+    # 885.82 MiB, so it could never satisfy that floor (D-005). This profile is
+    # shaped to clear 5 GiB while keeping the same mix of object sizes and key
+    # shapes as `full`, so the workload characteristics being measured are
+    # unchanged -- only the volume is.
+    #
+    #   large   40 x 128 MiB  = 5120 MiB  (the bulk, and exercises multi-object
+    #                                     erasure and per-drive allocation)
+    #   medium 200 x   1 MiB  =  200 MiB
+    #   small  2000 x  ~34 KiB =  ~66 MiB (avg of the 4 KiB-64 KiB range)
+    #   nested  100 x  ~36 KiB =  ~3.4 MiB
+    #   unicode 40, special 25, empty 4  -- small, but they cover the key and
+    #                                     zero-byte edge cases.
+    "profileb": [
+        ("small", 2000, (4 * 1024, 64 * 1024), "small-object throughput and LIST depth"),
+        ("medium", 200, (1024 * 1024, 1024 * 1024), "general mixed workload"),
+        ("large", 40, (128 * 1024 * 1024, 128 * 1024 * 1024), "large-object throughput"),
+        ("nested/a/b/c/d", 100, (8 * 1024, 64 * 1024), "nested prefix and LIST behaviour"),
+        ("empty", 4, (0, 0), "zero-byte object edge case"),
+        ("unicode/ünïcödé/δοκιμή", 40, (1 * 1024, 16 * 1024), "non-ASCII key handling"),
+        ("special/chars with spaces+plus", 25, (1 * 1024, 8 * 1024), "key characters needing quoting"),
+    ],
     # Fast subset for smoke-testing the pipeline itself.
     "smoke": [
         ("small", 10, (4 * 1024, 16 * 1024), "small-object throughput and LIST depth"),
@@ -84,6 +112,12 @@ PROFILES = {
         ("empty", 2, (0, 0), "zero-byte object edge case"),
     ],
 }
+
+# SRD profile B dataset floor. Enforced by --min-bytes so that "the dataset was
+# big enough" is checked by the tool and recorded as evidence, rather than
+# asserted in prose where a stale number can hide (which is how the 885.82 MiB
+# dataset came to be described as 2 GB in D-005).
+PROFILE_B_MIN_BYTES = 5 * 1024 ** 3
 
 SEED = "minio-vs-silo-evaluation/ST02"
 
@@ -182,6 +216,10 @@ def generate(out: str, profile: str, quiet: bool = False):
         "total_gib": round(total / (1024 ** 3), 3),
         "manifest": manifest_path,
     }
+    # Record the Profile B floor alongside the realised total so the evidence
+    # states whether the floor was met, without anyone having to remember it.
+    summary["profile_b_floor_bytes"] = PROFILE_B_MIN_BYTES
+    summary["meets_profile_b_floor"] = total >= PROFILE_B_MIN_BYTES
     with open(os.path.join(out, "dataset-summary.json"), "w") as f:
         json.dump(summary, f, indent=2, sort_keys=True)
         f.write("\n")
@@ -246,7 +284,11 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", required=True, help="output directory")
-    ap.add_argument("--profile", default="full", choices=sorted(PROFILES))
+    ap.add_argument("--profile", default="profileb", choices=sorted(PROFILES))
+    ap.add_argument("--min-bytes", type=int, default=PROFILE_B_MIN_BYTES,
+                    help="fail if the realised dataset is smaller than this "
+                         f"(default {PROFILE_B_MIN_BYTES} = the Profile B 5 GiB floor; "
+                         "pass 0 to disable)")
     ap.add_argument("--verify-deterministic", action="store_true",
                     help="regenerate and compare digests instead of writing data")
     ap.add_argument("--quiet", action="store_true")
@@ -254,7 +296,20 @@ def main():
 
     if args.verify_deterministic:
         sys.exit(verify_deterministic(args.out, args.profile, args.quiet))
-    generate(args.out, args.profile, args.quiet)
+
+    summary = generate(args.out, args.profile, args.quiet)
+
+    if args.min_bytes and summary["total_bytes"] < args.min_bytes:
+        print(
+            f"FATAL: dataset is {summary['total_bytes']} bytes "
+            f"({summary['total_gib']} GiB), below the required "
+            f"{args.min_bytes} bytes ({args.min_bytes / 1024**3:.2f} GiB) floor. "
+            "This dataset is NOT Profile B compliant and no benchmark taken "
+            "against it may be reported as Profile B evidence.",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    return None
 
 
 if __name__ == "__main__":

@@ -1,0 +1,36 @@
+== dataset generation and Profile B floor check
+captured: 2026-10-01T20:59:00Z
+
+{
+  "manifest": "lab/data/dataset/dataset-manifest.jsonl",
+  "meets_profile_b_floor": true,
+  "object_count": 2409,
+  "profile": "profileb",
+  "profile_b_floor_bytes": 5368709120,
+  "seed": "minio-vs-silo-evaluation/ST02",
+  "total_bytes": 5651848823,
+  "total_gib": 5.264
+}
+
+--- --verify-deterministic (regenerate and compare every SHA-256) ---
+{
+  "checked": 2409,
+  "deterministic": true,
+  "mismatches": 0
+}
+
+--- objects by category ---
+  empty        4 objects              0 bytes    0.00 GiB
+  large       40 objects     5368709120 bytes    5.00 GiB
+  medium     200 objects      209715200 bytes    0.20 GiB
+  nested     100 objects        3740934 bytes    0.00 GiB
+  small     2000 objects       69226248 bytes    0.06 GiB
+  special     25 objects         116801 bytes    0.00 GiB
+  unicode     40 objects         340520 bytes    0.00 GiB
+  TOTAL     2409 objects     5651848823 bytes    5.26 GiB
+
+--- retention modes requested (COMPLIANCE cannot be bypassed or shortened) ---
+  COMPLIANCE 1d    602
+  COMPLIANCE 30d   602
+  GOVERNANCE 1d    603
+  GOVERNANCE 7d    602
