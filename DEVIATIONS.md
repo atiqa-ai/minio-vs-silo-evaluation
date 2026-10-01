@@ -218,8 +218,26 @@ is labelled `provisional` wherever it is cited, per the approved decision.
 
 **Effect.** Every objective reference in this repository points at a provisional
 statement. If the authoritative O01–O08 text is provided later, the mapping must
-be re-checked; the derived statements are collected in
-`docs/00-srd/objectives-provisional.md`.
+be re-checked. The derived statements are reproduced below because the repository
+does not carry the source requirement documents.
+
+### Provisional objective mapping
+
+| ID | Subject | Confidence | Where it would be covered |
+|---|---|---|---|
+| O01 | Cluster homogeneity, no product mixing | Implied | Enforced structurally; ST05, ST09 |
+| O02 | Custom authorization policy behavior | Explicit | ST07 |
+| O03a | Older authentication settings | Explicit | ST07 |
+| O03b | Older notification settings | Explicit | ST07 |
+| O04 | Programs relying on old bugs | Explicit | ST07 |
+| O05 | Unknown | **No basis** | **Gap — not assessed** |
+| O06 | Multi-pool behaviour | Explicit | Out of scope: single-pool topology |
+| O07 | Replication and mixed-version | Explicit | Blocked by guardrails 11 |
+| O08 | Unknown | **No basis** | **Gap — not assessed** |
+
+O05 and O08 cannot be assessed at all: nothing in the supplied requirements states
+what they are, so no evidence could exist for them. That is a gap in the
+requirements, not a gap in the work.
 
 ---
 
@@ -358,9 +376,9 @@ runtime produced it.
 | Affects | ST04, ST05 |
 | Status | Approved |
 
-**Reason.** The supplied Jira reference (`docs/00-srd/jira-reference.md`) numbers
-the subtasks in a different order from the SRD's `ST01`–`ST10`. Two differences
-matter:
+**Reason.** The supplied Jira reference numbers the subtasks in a different
+order from the requirements' `ST01`–`ST10`. That document is not committed here.
+Two differences matter:
 
 | Subject | Jira | SRD |
 |---|---|---|

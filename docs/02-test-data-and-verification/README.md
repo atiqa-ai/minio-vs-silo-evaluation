@@ -22,7 +22,8 @@ Two of them — **Version ID** and **Checksum** — can only be obtained from th
 upload, so the manifest has two halves: a locally generated ground truth and a
 server-captured copy that is compared against it.
 
-Required test cases: `TC-ST02-01` … `TC-ST02-05` in `docs/00-test-cases/README.md`.
+Required test cases: `TC-ST02-01` … `TC-ST02-05` from the project test-case
+specification, which is held externally and is not committed here.
 
 ---
 
@@ -269,9 +270,9 @@ control (`wait -n`) instead of `xargs -P`.
 
 **9.7 — Sequencing slip, recorded for honesty.**
 This subtask had already reached seeding data while its status still read `Not Started`
-and while this README did not exist. MODEL_INSTRUCTIONS step 2 requires the status to be
-set before work begins, and guardrail 18 requires the expected result to be written
-before the test runs. The status was corrected and this README authored before the
+and while this README did not exist. The project rules require the status to be
+set before work begins, and the expected result to be written before the test
+runs. The status was corrected and this README authored before the
 remaining ST02 runs; the exploratory work in 9.1–9.4 happened in that earlier window and
 is reported as measured behaviour rather than as a prediction.
 

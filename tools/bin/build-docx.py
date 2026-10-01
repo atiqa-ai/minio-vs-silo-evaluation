@@ -93,19 +93,25 @@ def gather():
     f["deviation_count"] = len(f["deviations"])
     f["deviation_resolved"] = len(re.findall(r"RESOLVED 20", dev))
 
-    # Subtask status, read from the tracker table
-    tracker = read("docs/00-subtask-tracker/README.md")
+    # Subtask status, read from the README table so there is exactly one place
+    # in the repository where status is recorded.
+    tracker = read("README.md")
     rows = []
     for line in tracker.splitlines():
-        m = re.match(r"^\|\s*(ST\d{2})\s*\|\s*(DEV-\d+)\s*\|([^|]+)\|([^|]+)\|([^|]*)\|", line)
-        if m:
-            rows.append({
-                "st": m.group(1).strip(),
-                "jira": m.group(2).strip(),
-                "title": m.group(3).strip(),
-                "status": m.group(4).strip(),
-                "outcome": m.group(5).strip(),
-            })
+        if not re.match(r"^\|\s*ST\d{2}\s*\|", line):
+            continue
+        # Split on the pipe rather than matching with a regex: the status cell
+        # is bolded for some rows and plain for others, and a regex that tries
+        # to allow both silently drops every row when it gets one detail wrong.
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) < 4:
+            continue
+        rows.append({
+            "st": cells[0],
+            "jira": cells[1],
+            "title": cells[2],
+            "status": cells[3].replace("*", "").strip(),
+        })
     f["subtasks"] = rows
 
     # Per-folder report size: a proxy for how much substance each report carries
@@ -116,13 +122,16 @@ def gather():
             continue
         readme = os.path.join(p, "README.md")
         ev = os.path.join(p, "evidence")
+        readme_words = 0
+        if os.path.exists(readme):
+            with open(readme, encoding="utf-8") as fh:
+                readme_words = len(fh.read().split())
         n_ev = 0
         if os.path.isdir(ev):
             n_ev = len([x for x in os.listdir(ev) if not x.startswith(".")])
         folders.append({
             "dir": d,
-            "words": len(read(open(readme, encoding="utf-8").read()).split())
-            if os.path.exists(readme) else 0,
+            "words": readme_words,
             "evidence": n_ev,
             "has_readme": os.path.exists(readme),
             "has_evidence": os.path.isdir(ev),

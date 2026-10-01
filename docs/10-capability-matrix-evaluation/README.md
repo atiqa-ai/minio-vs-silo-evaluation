@@ -4,14 +4,12 @@
 **Jira:** `DEV-915`
 **Epic:** `DEV-904`
 
-> Placeholder. This subtask has not been started. The authoritative documents are
-> `docs/00-srd/README.md` (SRD), `docs/00-guardrails/README.md`,
-> `docs/00-evidence-guide/README.md`, `docs/00-test-cases/README.md` and
-> `docs/00-subtask-tracker/README.md`.
+> **Placeholder.** This subtask has not been started, so this report has no
+> findings. The structure below is the template to be filled in when it runs.
 >
-> Before any test is run, the 12 sections required by SRD section 10 must be
-> authored here in full, with **Expected result written before the test runs**
-> (guardrail 18).
+> When it is authored, the 12 required sections must be completed in full, with
+> the **expected result written before the test runs**, and every PASS backed by
+> raw output in `evidence/`.
 
 ## Required sections (SRD section 10)
 
@@ -30,7 +28,7 @@
 
 ## Test cases
 
-`docs/00-test-cases/README.md`, section **ST10**.
+The `ST\1` test cases defined by the project requirements (held externally, not committed here).
 
 ## Directories
 
