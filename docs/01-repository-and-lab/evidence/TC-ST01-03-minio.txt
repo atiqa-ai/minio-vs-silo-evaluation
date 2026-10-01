@@ -1,6 +1,6 @@
 Id: sha256:f71deba3825f2a57b4ab348b34aeec2fd1004c852f9d502f4d43dd17f7f4747a
-REPOSITORY       TAG                            DIGEST                                                                    IMAGE ID       CREATED          SIZE
-minio-ce-local   RELEASE.2025-10-15T17-29-55Z   sha256:f71deba3825f2a57b4ab348b34aeec2fd1004c852f9d502f4d43dd17f7f4747a   f71deba3825f   23 minutes ago   183MB
+REPOSITORY       TAG                            DIGEST                                                                    IMAGE ID       CREATED       SIZE
+minio-ce-local   RELEASE.2025-10-15T17-29-55Z   sha256:f71deba3825f2a57b4ab348b34aeec2fd1004c852f9d502f4d43dd17f7f4747a   f71deba3825f   2 hours ago   183MB
 
 --- declared in compose ---
 51:MINIO_IMAGE=minio-ce-local:RELEASE.2025-10-15T17-29-55Z

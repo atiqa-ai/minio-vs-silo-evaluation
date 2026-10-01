@@ -28,6 +28,10 @@ x-minio-common: &minio-common
     # Same credential-file variable names Silo's image bakes in, so ST07 can test
     # whether MinIO and Silo interpret the same MINIO_* surface identically.
     MINIO_BROWSER_REDIRECT_URL: ""
+    # The cluster metrics endpoint answers 403 unless this is set. It is required
+    # by the `monitoring` project mandated by SRD 4.4. Applied identically to the
+    # Silo cluster so the metrics surface stays comparable (guardrail 6).
+    MINIO_PROMETHEUS_AUTH_TYPE: "public"
   healthcheck:
     # ubi-micro has no curl and no wget. bash's /dev/tcp gives a real TCP probe
     # without adding a package manager to the image.

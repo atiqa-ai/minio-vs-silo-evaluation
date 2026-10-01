@@ -69,19 +69,25 @@ cd /home/devops/Documents/minio-vs-silo-evaluation
 ./tools/bin/lab up minio
 ./tools/bin/lab up proxy
 
-# 3. Capture ST01 evidence for the MinIO baseline
+# 3. Metrics scraper required by SRD 4.4. Starts alongside whichever single
+#    cluster is up and publishes no ports, so it does not breach SRD 4.4.
+./tools/bin/lab up monitoring
+
+# 4. Capture ST01 evidence for the MinIO baseline
 ./tools/bin/st01-verify minio
 
-# 4. Tear the baseline down before starting Silo: guardrails 15 forbids
+# 5. Tear the baseline down before starting Silo: guardrails 15 forbids
 #    running both heavy stacks at once
 ./tools/bin/lab down minio
 ./tools/bin/lab down proxy
 
-# 5. Silo cluster, identical topology and limits
+# 6. Silo cluster, identical topology and limits
 ./tools/bin/lab up silo
 ./tools/bin/lab up proxy
 
-# 6. Capture ST01 evidence for the Silo pass
+# 7. Capture ST01 evidence for the Silo pass. The scraper keeps running and
+#    is expected to report the MinIO targets as down, which is the recorded
+#    proof that only one heavy stack was live at a time.
 ./tools/bin/st01-verify silo
 ```
 
@@ -112,11 +118,11 @@ All eight test cases passed in **both** the MinIO and the Silo pass.
 | Evidence | Covers |
 |---|---|
 | `evidence/TC-ST01-01-{minio,silo}.txt` | Docker environment, storage, disk |
-| `evidence/TC-ST01-02-{minio,silo}.txt` | Compose v2, all four projects validate |
+| `evidence/TC-ST01-02-{minio,silo}.txt` | Compose v2, all five projects validate |
 | `evidence/TC-ST01-03-minio.txt` | MinIO tag, image ID, source provenance, runtime version |
 | `evidence/TC-ST01-04-silo.txt` | Silo tag, image digest, server and `mcli` versions |
 | `evidence/TC-ST01-05-{minio,silo}.txt` | `migration-net` exists; every lab container on exactly one network |
-| `evidence/TC-ST01-06-{minio,silo}.txt` | All nodes healthy, all reachable, cluster topology, DNS |
+| `evidence/TC-ST01-06-{minio,silo}.txt` | Monitoring scrapes the live cluster; nodes healthy, reachable, DNS resolves |
 | `evidence/TC-ST01-07-{minio,silo}.txt` | Published ports limited to console and proxy |
 | `evidence/TC-ST01-08-{minio,silo}.txt` | Every published port bound to loopback |
 | `evidence/minio-build-provenance.txt` | Full MinIO source-to-image provenance chain |
@@ -131,6 +137,20 @@ Silo:  Formatting 1st pool, 1 set(s), 4 drives per set.
 
 Every node of both clusters reported `Network: 4/4 OK`, `Drives: 1/1 OK`,
 `Pool: 1`.
+
+The `monitoring` project required by SRD 4.4 came up healthy and collected
+**77 distinct `minio_*` metric names** from the four live MinIO nodes. It
+publishes nothing: `HostConfig.PortBindings` for `lab-prometheus` is `{}`, and
+`Config.ExposedPorts` is only container metadata. Both facts are captured in
+`TC-ST01-07-minio.txt` and `TC-ST01-08-minio.txt`.
+
+Bringing the scraper up exposed a lab-side defect rather than a product one:
+every node answered `403 Forbidden` on `/minio/v2/metrics/cluster` until
+`MINIO_PROMETHEUS_AUTH_TYPE=public` was set. That variable was then set
+identically on all four nodes of **both** clusters, so the metric surface stays
+comparable and neither product gains an advantage. Recorded as D-015, and
+explicitly **not** a product finding: no MinIO-versus-Silo comparison was made
+and none may be inferred from it.
 
 ## 7. PASS/FAIL
 
@@ -184,6 +204,13 @@ omission. D-001 records it.
 | Silo S3 API (all nodes) | none | **no** |
 | `lb-silo` | `127.0.0.1:18081` | yes — proxy |
 | `mc-client`, `silo-client` | none | no |
+| `lab-prometheus` (monitoring) | none — `HostConfig.PortBindings` is `{}` | no — SRD 4.4 |
+
+SRD 4.4 permits only the consoles and the proxy to publish, so the monitoring
+project has no `ports:` key at all and is reachable only from `migration-net`.
+`Config.ExposedPorts` still lists `9090/tcp`, but that is container metadata,
+not a host binding — the distinction is recorded explicitly in the evidence so
+the two are not confused.
 
 Pre-existing containers outside this project (`grafana` on `0.0.0.0:3001`,
 `cadvisor` on `0.0.0.0:8080`, `soul-of-lahore`, `nginx-exporter`) were left
@@ -265,12 +292,26 @@ immutable tag and digest, and the MinIO baseline carries a complete
 source-to-image provenance chain. Credentials are synthetic and excluded from
 version control by both `.gitignore` and an active pre-commit secret scan.
 
-The one requirement not met is the public repository, unmet by explicit decision
-(D-001), not by oversight.
+All five Compose projects required by SRD 4.4 exist and validate, including the
+`monitoring` project, which scrapes the live cluster over `migration-net` without
+publishing a single port. The repository is public at
+`https://github.com/atiqa-ai/minio-vs-silo-evaluation` on `main`, with the epic
+and all twelve subtasks mirrored as GitHub issues. The residual gap on D-001 is
+that those issues are not yet attached to a GitHub Project board.
 
-Three limits are inherited from the host and must be restated in the final
-recommendation: benchmarks are indicative only (D-004), the dataset is 2 GB
-rather than 5–10 GB (D-005), and `fio`/NFS test cases are blocked (D-010).
+Two limits are inherited from the host and must be restated in the final
+recommendation:
+
+- **Benchmarks are indicative only** (D-004). 4 vCPU, 7.7 GiB RAM, VMware,
+  cgroup v2 — below Profile B.
+- **The dataset is not yet Profile B compliant** (D-005). The first generator
+  iteration realised **885.82 MiB / 669 objects**, against a 5 GB floor. ST02 is
+  regenerating at the 5 GB minimum, and until that passes, no benchmark number
+  from this dataset counts as Profile B evidence.
+
+`fio` and the NFS test cases are **no longer blocked** (D-010): they will run in
+containers rather than needing host packages. That supersedes the earlier
+"blocked" note in this section.
 
 ## 11. How to reproduce
 

@@ -11,25 +11,32 @@ lb-minio     80/tcp -> 127.0.0.1:18080
 lb-silo      (container not running)
 mc-client    
 silo-client  
+lab-prometheus 
 
 --- anything published by non-lab containers (must be pre-existing, not this project) ---
-lb-minio	127.0.0.1:18080->80/tcp
-minio-4	9000/tcp
 minio-2	9000/tcp
 minio-3	9000/tcp
 minio-1	9000/tcp, 127.0.0.1:9001->9001/tcp
+minio-4	9000/tcp
+lab-prometheus	9090/tcp
 silo-client	9000/tcp
 mc-client	
+lb-minio	127.0.0.1:18080->80/tcp
 grafana	0.0.0.0:3001->3000/tcp, [::]:3001->3000/tcp
 cadvisor	0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp
 soul-of-lahore	3000/tcp
 nginx-exporter	
 
 --- compose declared port mappings ---
-/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/minio/compose.yml:56:    ports:
-/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/minio/compose.yml-57-      - "${BIND_ADDR}:${MINIO_CONSOLE_PORT}:9001"
-/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/minio/compose.yml-58-    command: *minio-command
-/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/minio/compose.yml-59-
+/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/minio/compose.yml:60:    ports:
+/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/minio/compose.yml-61-      - "${BIND_ADDR}:${MINIO_CONSOLE_PORT}:9001"
+/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/minio/compose.yml-62-    command: *minio-command
+/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/minio/compose.yml-63-
+--
+/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/monitoring/compose.yml:14:#     therefore has no `ports:` key at all and is reachable only on
+/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/monitoring/compose.yml-15-#     migration-net.
+/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/monitoring/compose.yml-16-#   * This project is deliberately NOT started alongside both heavy stacks
+/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/monitoring/compose.yml-17-#     (guardrail 15). It runs alongside whichever single cluster is up; the
 --
 /home/devops/Documents/minio-vs-silo-evaluation/lab/compose/proxy/compose.yml:45:    ports:
 /home/devops/Documents/minio-vs-silo-evaluation/lab/compose/proxy/compose.yml-46-      - "${BIND_ADDR}:${MINIO_PROXY_PORT}:80"
@@ -41,9 +48,9 @@ nginx-exporter
 /home/devops/Documents/minio-vs-silo-evaluation/lab/compose/proxy/compose.yml-55-
 /home/devops/Documents/minio-vs-silo-evaluation/lab/compose/proxy/compose.yml-56-networks:
 --
-/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/silo/compose.yml:62:    ports:
-/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/silo/compose.yml-63-      - "${BIND_ADDR}:${SILO_CONSOLE_PORT}:9001"
-/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/silo/compose.yml-64-    command: *silo-command
-/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/silo/compose.yml-65-
+/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/silo/compose.yml:66:    ports:
+/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/silo/compose.yml-67-      - "${BIND_ADDR}:${SILO_CONSOLE_PORT}:9001"
+/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/silo/compose.yml-68-    command: *silo-command
+/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/silo/compose.yml-69-
 
 # exit status: 0

@@ -3,15 +3,20 @@ evidence set: minio  (nodes: minio-1 minio-2 minio-3 minio-4)
 --- compose projects present ---
 NAME                STATUS                  CONFIG FILES
 minio-cluster       running(4)              /home/devops/Documents/minio-vs-silo-evaluation/lab/compose/minio/compose.yml
+monitoring          running(1)              /home/devops/Documents/minio-vs-silo-evaluation/lab/compose/monitoring/compose.yml
 proxy               running(1)              /home/devops/Documents/minio-vs-silo-evaluation/lab/compose/proxy/compose.yml
 soul-oflahore       exited(4), running(4)   /home/devops/soul-of Lahore/docker-compose.yml
 workload            running(2)              /home/devops/Documents/minio-vs-silo-evaluation/lab/compose/workload/compose.yml
 
+--- monitoring project (SRD 4.4): scrapes the running cluster, publishes nothing ---
+lab-prometheus	Up 8 minutes (healthy)	9090/tcp
+HostConfig.PortBindings: {}
+
 --- cluster minio, all nodes healthy ---
-minio-4	Up About a minute (healthy)
-minio-2	Up About a minute (healthy)
-minio-3	Up About a minute (healthy)
-minio-1	Up About a minute (healthy)
+minio-2	Up 5 minutes (healthy)
+minio-3	Up 5 minutes (healthy)
+minio-1	Up 5 minutes (healthy)
+minio-4	Up 5 minutes (healthy)
 
 --- raw TCP reachability from a workload container to every node ---
 minio-1:9000 reachable
@@ -45,9 +50,9 @@ minio-4:9000 reachable
 silo-client -> minio-1:9000 reachable
 
 --- DNS resolution of node names from a workload container ---
-minio-1 -> 172.19.0.2      minio-1
-minio-2 -> 172.19.0.4      minio-2
+minio-1 -> 172.19.0.5      minio-1
+minio-2 -> 172.19.0.2      minio-2
 minio-3 -> 172.19.0.3      minio-3
-minio-4 -> 172.19.0.5      minio-4
+minio-4 -> 172.19.0.4      minio-4
 
 # exit status: 0

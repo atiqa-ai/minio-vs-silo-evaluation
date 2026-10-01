@@ -34,6 +34,10 @@ x-silo-common: &silo-common
   environment: &silo-env
     MINIO_ROOT_USER: ${MINIO_ROOT_USER}
     MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    # Identical to the MinIO cluster: the cluster metrics endpoint answers 403
+    # without it, and the `monitoring` project (SRD 4.4) needs it. Keeping the
+    # variable identical is what makes the two metric surfaces comparable.
+    MINIO_PROMETHEUS_AUTH_TYPE: "public"
   healthcheck:
     # Identical mechanism to the MinIO cluster so the health signal is not a
     # variable between the two products.

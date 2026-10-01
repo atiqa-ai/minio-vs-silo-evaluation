@@ -1,0 +1,47 @@
+# Scrape configuration for the evaluation lab.
+#
+# Both products are declared as separate job sets rather than being merged, so a
+# metric present in one and absent in the other is visible as a difference
+# instead of being averaged into a single "storage" job. Silo claims to expose
+# the same `minio_*` metric names as MinIO; that claim is checked in ST07 by
+# diffing the two `metric name` label sets.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    lab: minio-vs-silo-evaluation
+    epic: DEV-904
+
+scrape_configs:
+  # --- MinIO cluster nodes -------------------------------------------------
+  - job_name: minio-node
+    metrics_path: /minio/v2/metrics/cluster
+    static_configs:
+      - targets: ["minio-1:9000"]
+        labels: { product: minio, node: "1" }
+      - targets: ["minio-2:9000"]
+        labels: { product: minio, node: "2" }
+      - targets: ["minio-3:9000"]
+        labels: { product: minio, node: "3" }
+      - targets: ["minio-4:9000"]
+        labels: { product: minio, node: "4" }
+
+  # --- Silo cluster nodes --------------------------------------------------
+  # Silo is expected to serve the same path and the same metric names.
+  - job_name: silo-node
+    metrics_path: /minio/v2/metrics/cluster
+    static_configs:
+      - targets: ["silo-1:9000"]
+        labels: { product: silo, node: "1" }
+      - targets: ["silo-2:9000"]
+        labels: { product: silo, node: "2" }
+      - targets: ["silo-3:9000"]
+        labels: { product: silo, node: "3" }
+      - targets: ["silo-4:9000"]
+        labels: { product: silo, node: "4" }
+
+  # --- Prometheus itself ---------------------------------------------------
+  - job_name: prometheus
+    static_configs:
+      - targets: ["127.0.0.1:9090"]

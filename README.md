@@ -4,18 +4,22 @@
 
 ## Project Status
 
-| ID   | Subtask                                                      | Status      | Required Output                             |
-|------|--------------------------------------------------------------|-------------|---------------------------------------------|
-| ST01 | Set up repo, pin versions and build local Docker Compose lab | Complete   | Working local Compose lab                   |
-| ST02 | Seed test data and build verification toolkit                | Not Started | Synthetic data + manifest toolkit           |
-| ST03 | MinIO feature validation                                     | Not Started | MinIO feature baseline                      |
-| ST04 | MinIO performance baseline: local versus NFS-backed storage  | Not Started | MinIO performance baseline                  |
-| ST05 | MinIO distributed mode: resilience, healing and expansion    | Not Started | Distributed behavior + replication evidence |
-| ST06 | Silo functional validation                                   | Not Started | Silo functional results                     |
-| ST07 | S3 and client compatibility diff                             | Not Started | Compatibility comparison + O01–O08          |
-| ST08 | Benchmark Silo and compare with MinIO baseline               | Not Started | Performance comparison                      |
-| ST09 | Security, licensing, maintenance and CVE review              | Not Started | Security/licensing/maintenance review       |
-| ST10 | Capability matrix, evaluation report and recommendation      | Not Started | Final matrix + evaluation                   |
+| ID   | Jira          | Subtask                                                      | Status      | Required Output                             |
+|------|---------------|--------------------------------------------------------------|-------------|---------------------------------------------|
+| ST01 | DEV-905       | Set up repo, pin versions and build local Docker Compose lab | Complete   | Working local Compose lab                   |
+| ST02 | DEV-906       | Seed test data and build verification toolkit                | In Progress | Synthetic data + manifest toolkit           |
+| ST03 | DEV-907       | MinIO feature validation                                     | Not Started | MinIO feature baseline                      |
+| ST04 | DEV-910       | MinIO performance baseline: local versus NFS-backed storage  | Not Started | MinIO performance baseline                  |
+| ST05 | DEV-908/909   | MinIO distributed mode: resilience, healing and expansion    | Not Started | Distributed behavior + replication evidence |
+| ST06 | DEV-911       | Silo functional validation                                   | Not Started | Silo functional results                     |
+| ST07 | DEV-912       | S3 and client compatibility diff                             | Not Started | Compatibility comparison + O01–O08          |
+| ST08 | DEV-913       | Benchmark Silo and compare with MinIO baseline               | Not Started | Performance comparison                      |
+| ST09 | DEV-914       | Security, licensing, maintenance and CVE review              | Not Started | Security/licensing/maintenance review       |
+| ST10 | DEV-915       | Capability matrix, evaluation report and recommendation      | Not Started | Final matrix + evaluation                   |
+
+Main epic: [`DEV-904`](https://github.com/atiqa-ai/minio-vs-silo-evaluation/issues/1).
+The **ST sequence is the execution order**; the Jira keys are a tracking map. See
+`DEVIATIONS.md` D-012.
 
 **Status values (use only these):** `Not Started` | `In Progress` | `Blocked` | `Complete`
 

@@ -1,0 +1,54 @@
+# Monitoring — required by SRD 4.4, which separates the lab into Compose
+# projects: minio-*, silo-*, proxy, workload, monitoring.
+#
+# Purpose: capture the `minio_*` Prometheus metric surface that both products
+# claim to expose, so the claim can be compared rather than believed
+# (guardrails 13, 24). Metric-name parity is evidence for ST07
+# TC-ST07-03 "configuration compatibility".
+#
+# Isolation rules this file obeys:
+#   * Only MinIO and Silo clusters are scraped. This project never mixes
+#     products in one cluster (guardrail 4) — it observes them separately.
+#   * NOTHING is published. SRD 4.4 permits only consoles and the proxy to
+#     publish ports, and any published port must bind 127.0.0.1. Prometheus
+#     therefore has no `ports:` key at all and is reachable only on
+#     migration-net.
+#   * This project is deliberately NOT started alongside both heavy stacks
+#     (guardrail 15). It runs alongside whichever single cluster is up; the
+#     other product's targets are expected to report `down`, which is itself
+#     recorded as evidence that only one stack runs at a time.
+
+name: monitoring
+
+services:
+  prometheus:
+    image: ${PROMETHEUS_IMAGE}
+    container_name: lab-prometheus
+    user: "65534:65534"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=6h
+      - --web.enable-lifecycle
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - migration-net
+    # No published ports, by design. See the header.
+    healthcheck:
+      # The busybox shell in this image has wget, which is enough for the
+      # /-/ready endpoint. No extra image is pulled just to healthcheck.
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:9090/-/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+networks:
+  migration-net:
+    external: true
+    name: migration-net
+
+volumes:
+  prometheus-data:

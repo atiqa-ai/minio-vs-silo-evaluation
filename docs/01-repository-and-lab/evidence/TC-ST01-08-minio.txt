@@ -3,10 +3,13 @@
 {"9000/tcp":null,"9001/tcp":[{"HostIp":"127.0.0.1","HostPort":"9001"}]}
 [lb-minio]
 {"80/tcp":[{"HostIp":"127.0.0.1","HostPort":"18080"}]}
+[lab-prometheus]
+{"9090/tcp":null}
 
 --- assert every lab published port binds to 127.0.0.1 ---
   minio-1 -> 127.0.0.1:9001
   lb-minio -> 127.0.0.1:18080
+  lab-prometheus -> no host port bindings (must publish nothing: SRD 4.4)
 
 --- listening sockets for lab ports only ---
   lab ports from .env: 9001|9011|18080|18081

@@ -37,14 +37,14 @@ Docker Root Dir: /var/lib/docker
 
 --- storage ---
 TYPE            TOTAL     ACTIVE    SIZE      RECLAIMABLE
-Images          13        11        3.733GB   3.681GB (98%)
-Containers      15        11        454.7kB   200.7kB (44%)
-Local Volumes   7         6         42.79MB   1.616kB (0%)
+Images          14        12        4.114GB   4.063GB (98%)
+Containers      16        12        553kB     200.7kB (36%)
+Local Volumes   17        7         43.01MB   1.616kB (0%)
 Build Cache     17        0         1.319GB   1.094GB
 
 --- data root ---
 Filesystem      Size  Used Avail Use% Mounted on
-/dev/sda2        48G   29G   18G  62% /
-/dev/sda2        48G   29G   18G  62% /
+/dev/sda2        48G   32G   15G  69% /
+/dev/sda2        48G   32G   15G  69% /
 
 # exit status: 0

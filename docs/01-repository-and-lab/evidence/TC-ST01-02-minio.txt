@@ -8,5 +8,6 @@ minio: VALID
 silo: VALID
 proxy: VALID
 workload: VALID
+monitoring: VALID
 
 # exit status: 0

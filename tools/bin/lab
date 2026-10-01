@@ -12,7 +12,8 @@
 #   lab up silo            start the 4-node Silo cluster, wait until healthy
 #   lab up proxy           start the load balancers
 #   lab up workload        start the long-lived client containers
-#   lab down minio|silo|proxy|workload
+#   lab up monitoring      start the metrics scraper (publishes no ports)
+#   lab down minio|silo|proxy|workload|monitoring
 #   lab status             show what is running
 #   lab ps <product>       compose ps for one project
 
@@ -31,11 +32,12 @@ say() { printf '\n== %s ==\n' "$*"; }
 # Product name -> compose project directory.
 project_for() {
   case "$1" in
-    minio)    echo minio ;;
-    silo)     echo silo ;;
-    proxy)    echo proxy ;;
-    workload) echo workload ;;
-    *)        die "unknown target '$1' (expected minio|silo|proxy|workload)" ;;
+    minio)     echo minio ;;
+    silo)      echo silo ;;
+    proxy)     echo proxy ;;
+    workload)  echo workload ;;
+    monitoring) echo monitoring ;;
+    *)         die "unknown target '$1' (expected minio|silo|proxy|workload|monitoring)" ;;
   esac
 }
 
@@ -45,18 +47,21 @@ dc() {
 }
 
 wait_healthy() {
-  local dir="$1" timeout="${2:-180}" waited=0
-  say "waiting for $dir to become healthy (timeout ${timeout}s)"
+  # $1 = compose project name, $2 = timeout. The project name is passed in
+  # rather than derived from the directory, because minio-cluster and
+  # silo-cluster do not follow the "<dir>-cluster" shape uniformly.
+  local project="$1" timeout="${2:-180}" waited=0 running
+  say "waiting for $project to become healthy (timeout ${timeout}s)"
   while [ "$waited" -lt "$timeout" ]; do
     local total unhealthy
-    total="$(docker ps --filter "label=com.docker.compose.project=$(basename "$dir")-cluster" -q | wc -l)"
-    unhealthy="$(docker ps --filter "label=com.docker.compose.project=$(basename "$dir")-cluster" \
+    total="$(docker ps --filter "label=com.docker.compose.project=$project" -q | wc -l)"
+    unhealthy="$(docker ps --filter "label=com.docker.compose.project=$project" \
                   --filter health=unhealthy -q | wc -l)"
     if [ "$total" -gt 0 ] && [ "$unhealthy" -eq 0 ]; then
-      running="$(docker ps --filter "label=com.docker.compose.project=$(basename "$dir")-cluster" \
+      running="$(docker ps --filter "label=com.docker.compose.project=$project" \
                   --filter status=running -q | wc -l)"
       if [ "$running" -eq "$total" ]; then
-        echo "  $dir: $running/$total running, 0 unhealthy"
+        echo "  $project: $running/$total running, 0 unhealthy"
         return 0
       fi
     fi
@@ -64,7 +69,7 @@ wait_healthy() {
     waited=$((waited + 5))
     printf '  ... %ss\n' "$waited"
   done
-  printf '  TIMEOUT waiting for %s\n' "$dir" >&2
+  printf '  TIMEOUT waiting for %s\n' "$project" >&2
   return 1
 }
 
@@ -79,7 +84,7 @@ case "${1:-}" in
     ;;
 
   up)
-    target="${2:-}"; [ -n "$target" ] || die "usage: lab up <minio|silo|proxy|workload>"
+    target="${2:-}"; [ -n "$target" ] || die "usage: lab up <minio|silo|proxy|workload|monitoring>"
     dir="$(project_for "$target")"
 
     # nginx resolves its upstream names while loading the config and exits with
@@ -101,13 +106,15 @@ case "${1:-}" in
 
     dc "$dir" up -d
     case "$target" in
-      minio|silo) wait_healthy "$dir" ;;
+      minio)     wait_healthy minio-cluster ;;
+      silo)      wait_healthy silo-cluster ;;
+      monitoring) wait_healthy monitoring 120 ;;
       *) sleep 3; dc "$dir" ps ;;
     esac
     ;;
 
   down)
-    target="${2:-}"; [ -n "$target" ] || die "usage: lab down <minio|silo|proxy|workload>"
+    target="${2:-}"; [ -n "$target" ] || die "usage: lab down <minio|silo|proxy|workload|monitoring>"
     dir="$(project_for "$target")"
     # Guardrails 20: refuse to remove data volumes. Cluster data lives in bind
     # mounts under lab/data, which Compose never owns, so no -v is ever passed.
@@ -116,14 +123,14 @@ case "${1:-}" in
 
   status)
     say "compose projects"
-    for dir in minio silo proxy workload; do
+    for dir in minio silo proxy workload monitoring; do
       printf '%s:\n' "$dir"
       dc "$dir" ps --format '  {{.Name}}\t{{.Status}}' 2>/dev/null || echo "  (not created)"
     done
     ;;
 
   ps)
-    target="${2:-}"; [ -n "$target" ] || die "usage: lab ps <minio|silo|proxy|workload>"
+    target="${2:-}"; [ -n "$target" ] || die "usage: lab ps <minio|silo|proxy|workload|monitoring>"
     dc "$(project_for "$target")" ps
     ;;
 
