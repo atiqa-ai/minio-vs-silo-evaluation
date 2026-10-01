@@ -1,0 +1,27 @@
+--- lab bind addresses, from container inspect (authoritative) ---
+[silo-1]
+{"9000/tcp":null,"9001/tcp":[{"HostIp":"127.0.0.1","HostPort":"9011"}]}
+[lb-silo]
+{"80/tcp":[{"HostIp":"127.0.0.1","HostPort":"18081"}]}
+
+--- assert every lab published port binds to 127.0.0.1 ---
+  silo-1 -> 127.0.0.1:9011
+  lb-silo -> 127.0.0.1:18081
+
+--- listening sockets for lab ports only ---
+  lab ports from .env: 9001|9011|18080|18081
+  LISTEN 0      4096       127.0.0.1:18081      0.0.0.0:*   
+  LISTEN 0      4096       127.0.0.1:9011       0.0.0.0:*   
+
+--- assert none of the lab ports is wildcard-bound ---
+  OK: every lab port is bound to a loopback address only
+
+--- unrelated pre-existing containers (recorded for context, NOT this project) ---
+  grafana          3000/tcp -> 0.0.0.0:3001 3000/tcp -> [::]:3001 
+  cadvisor         8080/tcp -> 0.0.0.0:8080 8080/tcp -> [::]:8080 
+  nginx-exporter   
+
+--- BIND_ADDR in .env ---
+44:BIND_ADDR=127.0.0.1
+
+# exit status: 0

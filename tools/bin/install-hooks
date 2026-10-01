@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# Install the git-native pre-commit hook for this repository.
+#
+# ST01 requires secret scanning to be ACTIVE, not merely documented. This writes
+# .git/hooks/pre-commit so that gitleaks runs on every commit without needing the
+# pre-commit Python framework installed.
+#
+# It runs the same checks as .pre-commit-config.yaml:
+#   1. gitleaks secret scan over staged content
+#   2. no ':latest' image tags
+#   3. no MinIO/Silo mixing in a single cluster
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+HOOK="$ROOT/.git/hooks/pre-commit"
+GITLEAKS="$ROOT/tools/bin/gitleaks"
+
+[ -d "$ROOT/.git" ] || { echo "install-hooks: $ROOT is not a git repository" >&2; exit 1; }
+[ -x "$GITLEAKS" ] || { echo "install-hooks: gitleaks not found at $GITLEAKS" >&2; exit 1; }
+
+mkdir -p "$ROOT/.git/hooks"
+
+cat > "$HOOK" <<'HOOKEOF'
+#!/usr/bin/env bash
+# Installed by tools/bin/install-hooks — do not edit; edit
+# .pre-commit-config.yaml and re-run tools/bin/install-hooks instead.
+set -uo pipefail
+
+# A git hook lives at <repo>/.git/hooks/, so the repository root is two levels
+# up from this script's directory, not one.
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+fail=0
+
+if [ ! -x "$ROOT/tools/bin/gitleaks" ]; then
+  echo "pre-commit: gitleaks not found at $ROOT/tools/bin/gitleaks" >&2
+  echo "pre-commit: FAILED — refusing to commit without a secret scan." >&2
+  exit 1
+fi
+
+echo "pre-commit: scanning staged content for secrets (gitleaks)"
+if ! "$ROOT/tools/bin/gitleaks" protect --staged \
+      --config "$ROOT/.gitleaks.toml" \
+      --redact \
+      --exit-code 1; then
+  echo "pre-commit: SECRET SCAN FAILED — commit blocked." >&2
+  fail=1
+fi
+
+for check in check-no-latest check-no-mixed-cluster; do
+  echo "pre-commit: $check"
+  "$ROOT/tools/bin/$check" || fail=1
+done
+
+if [ "$fail" -ne 0 ]; then
+  echo "pre-commit: FAILED — commit blocked by the checks above." >&2
+  exit 1
+fi
+
+echo "pre-commit: all checks passed"
+HOOKEOF
+
+chmod +x "$HOOK"
+echo "installed $HOOK"
+echo
+echo "Verify with: git commit --dry-run   (or make a trivial commit attempt)"

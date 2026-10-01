@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+# Lab control helper for the MinIO vs Silo evaluation.
+#
+# Every Compose project is driven from here so that start/stop order is applied
+# consistently. Guardrails 15: never run more than one heavy stack at a time.
+# Guardrails 20: keep runs isolated — every destructive command must name the
+# product it targets, so "down" can never be ambiguous about which stack it hits.
+#
+# Usage:
+#   lab network            create the shared migration-net (idempotent)
+#   lab up minio           start the 4-node MinIO cluster, wait until healthy
+#   lab up silo            start the 4-node Silo cluster, wait until healthy
+#   lab up proxy           start the load balancers
+#   lab up workload        start the long-lived client containers
+#   lab down minio|silo|proxy|workload
+#   lab status             show what is running
+#   lab ps <product>       compose ps for one project
+
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$HERE/../.." && pwd)"
+COMPOSE="$ROOT/lab/compose"
+ENV_FILE="$COMPOSE/.env"
+
+die() { printf 'lab: %s\n' "$*" >&2; exit 1; }
+say() { printf '\n== %s ==\n' "$*"; }
+
+[ -f "$ENV_FILE" ] || die "missing $ENV_FILE (copy .env.example and set credentials)"
+
+# Product name -> compose project directory.
+project_for() {
+  case "$1" in
+    minio)    echo minio ;;
+    silo)     echo silo ;;
+    proxy)    echo proxy ;;
+    workload) echo workload ;;
+    *)        die "unknown target '$1' (expected minio|silo|proxy|workload)" ;;
+  esac
+}
+
+dc() {
+  local dir="$1"; shift
+  ( cd "$COMPOSE/$dir" && docker compose --env-file "$ENV_FILE" "$@" )
+}
+
+wait_healthy() {
+  local dir="$1" timeout="${2:-180}" waited=0
+  say "waiting for $dir to become healthy (timeout ${timeout}s)"
+  while [ "$waited" -lt "$timeout" ]; do
+    local total unhealthy
+    total="$(docker ps --filter "label=com.docker.compose.project=$(basename "$dir")-cluster" -q | wc -l)"
+    unhealthy="$(docker ps --filter "label=com.docker.compose.project=$(basename "$dir")-cluster" \
+                  --filter health=unhealthy -q | wc -l)"
+    if [ "$total" -gt 0 ] && [ "$unhealthy" -eq 0 ]; then
+      running="$(docker ps --filter "label=com.docker.compose.project=$(basename "$dir")-cluster" \
+                  --filter status=running -q | wc -l)"
+      if [ "$running" -eq "$total" ]; then
+        echo "  $dir: $running/$total running, 0 unhealthy"
+        return 0
+      fi
+    fi
+    sleep 5
+    waited=$((waited + 5))
+    printf '  ... %ss\n' "$waited"
+  done
+  printf '  TIMEOUT waiting for %s\n' "$dir" >&2
+  return 1
+}
+
+case "${1:-}" in
+  network)
+    if docker network inspect migration-net >/dev/null 2>&1; then
+      echo "migration-net already exists"
+    else
+      docker network create migration-net >/dev/null
+      echo "created migration-net"
+    fi
+    ;;
+
+  up)
+    target="${2:-}"; [ -n "$target" ] || die "usage: lab up <minio|silo|proxy|workload>"
+    dir="$(project_for "$target")"
+
+    # nginx resolves its upstream names while loading the config and exits with
+    # "host not found in upstream" if any backend is missing. A load balancer
+    # for a cluster that is not running would therefore crash-loop, so start
+    # only the balancers whose backend cluster is actually up.
+    if [ "$target" = "proxy" ]; then
+      services=()
+      docker ps --format '{{.Names}}' | grep -qx 'minio-1' && services+=(lb-minio)
+      docker ps --format '{{.Names}}' | grep -qx 'silo-1'  && services+=(lb-silo)
+      if [ "${#services[@]}" -eq 0 ]; then
+        die "no cluster is running; start a cluster before the proxy"
+      fi
+      say "starting ${services[*]}"
+      dc "$dir" up -d "${services[@]}"
+      dc "$dir" ps
+      exit 0
+    fi
+
+    dc "$dir" up -d
+    case "$target" in
+      minio|silo) wait_healthy "$dir" ;;
+      *) sleep 3; dc "$dir" ps ;;
+    esac
+    ;;
+
+  down)
+    target="${2:-}"; [ -n "$target" ] || die "usage: lab down <minio|silo|proxy|workload>"
+    dir="$(project_for "$target")"
+    # Guardrails 20: refuse to remove data volumes. Cluster data lives in bind
+    # mounts under lab/data, which Compose never owns, so no -v is ever passed.
+    dc "$dir" down --remove-orphans
+    ;;
+
+  status)
+    say "compose projects"
+    for dir in minio silo proxy workload; do
+      printf '%s:\n' "$dir"
+      dc "$dir" ps --format '  {{.Name}}\t{{.Status}}' 2>/dev/null || echo "  (not created)"
+    done
+    ;;
+
+  ps)
+    target="${2:-}"; [ -n "$target" ] || die "usage: lab ps <minio|silo|proxy|workload>"
+    dc "$(project_for "$target")" ps
+    ;;
+
+  *)
+    sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'
+    exit 1
+    ;;
+esac

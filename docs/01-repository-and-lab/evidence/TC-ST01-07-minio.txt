@@ -1,0 +1,49 @@
+--- published ports of every lab container (blank = none published) ---
+minio-1      9001/tcp -> 127.0.0.1:9001 
+minio-2      
+minio-3      
+minio-4      
+silo-1       (container not running)
+silo-2       (container not running)
+silo-3       (container not running)
+silo-4       (container not running)
+lb-minio     80/tcp -> 127.0.0.1:18080 
+lb-silo      (container not running)
+mc-client    
+silo-client  
+
+--- anything published by non-lab containers (must be pre-existing, not this project) ---
+lb-minio	127.0.0.1:18080->80/tcp
+minio-4	9000/tcp
+minio-2	9000/tcp
+minio-3	9000/tcp
+minio-1	9000/tcp, 127.0.0.1:9001->9001/tcp
+silo-client	9000/tcp
+mc-client	
+grafana	0.0.0.0:3001->3000/tcp, [::]:3001->3000/tcp
+cadvisor	0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp
+soul-of-lahore	3000/tcp
+nginx-exporter	
+
+--- compose declared port mappings ---
+/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/minio/compose.yml:56:    ports:
+/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/minio/compose.yml-57-      - "${BIND_ADDR}:${MINIO_CONSOLE_PORT}:9001"
+/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/minio/compose.yml-58-    command: *minio-command
+/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/minio/compose.yml-59-
+--
+/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/proxy/compose.yml:45:    ports:
+/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/proxy/compose.yml-46-      - "${BIND_ADDR}:${MINIO_PROXY_PORT}:80"
+/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/proxy/compose.yml-47-
+/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/proxy/compose.yml-48-  lb-silo:
+--
+/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/proxy/compose.yml:53:    ports:
+/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/proxy/compose.yml-54-      - "${BIND_ADDR}:${SILO_PROXY_PORT}:80"
+/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/proxy/compose.yml-55-
+/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/proxy/compose.yml-56-networks:
+--
+/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/silo/compose.yml:62:    ports:
+/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/silo/compose.yml-63-      - "${BIND_ADDR}:${SILO_CONSOLE_PORT}:9001"
+/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/silo/compose.yml-64-    command: *silo-command
+/home/devops/Documents/minio-vs-silo-evaluation/lab/compose/silo/compose.yml-65-
+
+# exit status: 0

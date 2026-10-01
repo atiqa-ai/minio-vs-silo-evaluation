@@ -1,0 +1,53 @@
+evidence set: silo  (nodes: silo-1 silo-2 silo-3 silo-4)
+
+--- compose projects present ---
+NAME                STATUS                  CONFIG FILES
+proxy               running(1)              /home/devops/Documents/minio-vs-silo-evaluation/lab/compose/proxy/compose.yml
+silo-cluster        running(4)              /home/devops/Documents/minio-vs-silo-evaluation/lab/compose/silo/compose.yml
+soul-oflahore       exited(4), running(4)   /home/devops/soul-of Lahore/docker-compose.yml
+workload            running(2)              /home/devops/Documents/minio-vs-silo-evaluation/lab/compose/workload/compose.yml
+
+--- cluster silo, all nodes healthy ---
+silo-1	Up About a minute (healthy)
+silo-3	Up About a minute (healthy)
+silo-4	Up About a minute (healthy)
+silo-2	Up About a minute (healthy)
+
+--- raw TCP reachability from a workload container to every node ---
+silo-1:9000 reachable
+silo-2:9000 reachable
+silo-3:9000 reachable
+silo-4:9000 reachable
+
+--- S3 API via mc, same binary for both products ---
+●  silo-1:9000
+   Version: 2026-09-16T00:00:00Z
+   Network: 4/4 OK 
+   Drives: 1/1 OK 
+   Pool: 1
+●  silo-2:9000
+   Version: 2026-09-16T00:00:00Z
+   Network: 4/4 OK 
+   Drives: 1/1 OK 
+   Pool: 1
+●  silo-3:9000
+   Version: 2026-09-16T00:00:00Z
+   Network: 4/4 OK 
+   Drives: 1/1 OK 
+   Pool: 1
+●  silo-4:9000
+   Version: 2026-09-16T00:00:00Z
+   Network: 4/4 OK 
+   Drives: 1/1 OK 
+   Pool: 1
+
+--- the other product's client container can also reach this cluster (shared network) ---
+mc-client -> silo-1:9000 reachable
+
+--- DNS resolution of node names from a workload container ---
+silo-1 -> 172.19.0.3      silo-1
+silo-2 -> 172.19.0.5      silo-2
+silo-3 -> 172.19.0.4      silo-3
+silo-4 -> 172.19.0.2      silo-4
+
+# exit status: 0

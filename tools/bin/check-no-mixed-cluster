@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Reject any Compose project or nginx upstream block that mixes MinIO and Silo
+# nodes.
+#
+# Guardrails 4: every cluster must be a single product at a single version. A
+# file that references both minio-* and silo-* hostnames would produce a hybrid
+# cluster whose results are meaningless, and would also invalidate the
+# Identical-Test Rule (guardrails 6).
+#
+# The MinIO and Silo cluster files live in separate directories, and the proxy
+# file may reference both because it balances to two separate upstream pools that
+# are never combined into one cluster.
+#
+# Comments are stripped before matching. The Silo compose file documents its
+# differences from the MinIO file in a comment that necessarily mentions
+# "minio-1..4"; prose about the other product is not a cluster reference.
+
+set -uo pipefail
+cd "$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "not a git repo" >&2; exit 1; }
+
+status=0
+
+# Emits node references found in non-comment content only.
+nodes_in() {
+  grep -v '^[[:space:]]*#' "$1" | grep -oE '\b(minio|silo)-[1-9][0-9]*\b' || true
+}
+
+check_file() {
+  local f="$1"
+  [ -f "$f" ] || return 0
+  local refs m s
+  refs="$(nodes_in "$f")"
+  m="$(printf '%s\n' "$refs" | grep -c '^minio-' || true)"
+  s="$(printf '%s\n' "$refs" | grep -c '^silo-'  || true)"
+  printf '  %-42s %s minio, %s silo\n' "$f" "$m" "$s"
+  if [ "$m" -gt 0 ] && [ "$s" -gt 0 ]; then
+    echo "    FAILED: one cluster file must reference a single product"
+    status=1
+  fi
+}
+
+echo "check-no-mixed-cluster:"
+for f in lab/compose/minio/compose.yml lab/compose/silo/compose.yml; do
+  check_file "$f"
+done
+for f in lab/compose/proxy/nginx-minio.conf lab/compose/proxy/nginx-silo.conf; do
+  check_file "$f"
+done
+
+if [ "$status" -eq 0 ]; then
+  echo "  OK: no cluster mixes products"
+fi
+exit "$status"

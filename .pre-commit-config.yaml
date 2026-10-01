@@ -1,0 +1,49 @@
+# Pre-commit hooks for the MinIO vs Silo evaluation repository.
+#
+# The active, enforced hook is the secret scanner. Guardrails 20 requires that
+# lab credentials never reach version control, and ST01 requires secret scanning
+# to be active before any commit is made.
+#
+# This file is the portable definition, usable by anyone with the pre-commit
+# framework installed:
+#     pipx install pre-commit     (or: pip install --user pre-commit)
+#     pre-commit install
+#
+# A git-native copy of the same check is installed at .git/hooks/pre-commit by
+# tools/bin/install-hooks, so the secret scan is enforced even on a machine that
+# has no pre-commit framework. Both run the same gitleaks binary and the same
+# config.
+
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  - repo: local
+    hooks:
+      - id: forbid-latest-tag
+        name: reject ':latest' image tags
+        entry: tools/bin/check-no-latest
+        language: script
+        pass_filenames: false
+        always_run: true
+
+      - id: forbid-cross-product-mixing
+        name: reject MinIO/Silo nodes in the same compose project
+        entry: tools/bin/check-no-mixed-cluster
+        language: script
+        pass_filenames: false
+        always_run: true
+
+      - id: trailing-whitespace
+        name: trim trailing whitespace
+        entry: bash -c 'for f in $(git diff --cached --name-only --diff-filter=ACM | grep -Ev "\.(png|jpg|jpeg|gif|svg)$"); do [ -f "$f" ] || continue; sed -i "s/[[:space:]]*$//" "$f"; done'
+        language: system
+        pass_filenames: false
+
+      - id: end-of-file-fixer
+        name: ensure files end with a newline
+        entry: bash -c 'for f in $(git diff --cached --name-only --diff-filter=ACM); do [ -f "$f" ] || continue; case "$f" in *.png|*.jpg|*.jpeg|*.gif|*.svg) continue;; esac; [ -s "$f" ] && [ "$(tail -c1 "$f" | wc -l)" -eq 0 ] && printf "\n" >> "$f"; done; true'
+        language: system
+        pass_filenames: false

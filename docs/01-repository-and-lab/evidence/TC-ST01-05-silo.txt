@@ -1,0 +1,29 @@
+8d2d026b45b3   migration-net           bridge    local
+
+Name: migration-net
+Driver: bridge
+Scope: local
+Internal: false
+
+--- attached containers ---
+silo-2  172.19.0.5/16
+mc-client  172.19.0.7/16
+silo-4  172.19.0.2/16
+silo-3  172.19.0.4/16
+silo-1  172.19.0.3/16
+silo-client  172.19.0.6/16
+lb-silo  172.19.0.8/16
+
+--- networks used by every lab container (must be exactly one: migration-net) ---
+minio-1: 
+(absent)
+minio-2: 
+(absent)
+minio-3: 
+(absent)
+minio-4: 
+(absent)
+mc-client: migration-net 
+silo-client: migration-net 
+
+# exit status: 0

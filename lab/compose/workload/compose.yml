@@ -1,0 +1,58 @@
+# Workload project — clients and benchmark drivers.
+#
+# Hosts the tools the project is required to use: mc, mcli and warp.
+# Nothing in this project publishes a port (SRD 4.4: only consoles and the proxy
+# publish). Everything reaches the clusters over migration-net.
+#
+# The client containers are long-lived so that many commands can be executed
+# against them without re-creating a container each time. The mc config lives in
+# a named volume so aliases persist between commands.
+
+name: workload
+
+x-client-common: &client-common
+  restart: unless-stopped
+  networks: [migration-net]
+  entrypoint: ["/bin/bash"]
+  command: ["-c", "while true; do sleep 3600; done"]
+  deploy:
+    resources:
+      limits:
+        cpus: "0.50"
+        memory: "256m"
+
+services:
+  # MinIO client tooling: mc against the MinIO cluster.
+  mc-client:
+    <<: *client-common
+    container_name: mc-client
+    image: ${MC_IMAGE}
+    environment:
+      MC_CONFIG_DIR: /config
+      HOME: /tmp
+    volumes:
+      - mc-config:/config
+    working_dir: /work
+
+  # Silo client tooling: mcli (and mc, which Silo still accepts) against Silo.
+  # mcli ships inside the Silo image at /usr/bin/mcli — there is no separate
+  # mcli image or repository, so the Silo image is used directly as the client.
+  silo-client:
+    <<: *client-common
+    container_name: silo-client
+    image: ${SILO_IMAGE}
+    environment:
+      MC_CONFIG_DIR: /config
+      HOME: /tmp
+    volumes:
+      - silo-config:/config
+    working_dir: /work
+
+volumes:
+  mc-config:
+  silo-config:
+
+networks:
+  migration-net:
+    external: true
+    name: migration-net

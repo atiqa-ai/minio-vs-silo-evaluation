@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Reject ':latest' (or otherwise unpinned) container image references.
+#
+# SRD 4.3 requires every image to be pinned to an immutable tag, and the whole
+# point of the evaluation is that a result can be reproduced later from an exact
+# image. ':latest' silently breaks that.
+#
+# Checks only files staged for commit, so an unpinned reference elsewhere in the
+# working tree does not block unrelated work.
+
+set -uo pipefail
+cd "$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "not a git repo" >&2; exit 1; }
+
+status=0
+files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ya?ml|env|sh)$' || true)
+[ -z "$files" ] && exit 0
+
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  [ -f "$f" ] || continue
+  # Ignore comment lines: prose about ':latest' is allowed, references are not.
+  hits=$(grep -nE '^[^#]*\bimage:[[:space:]]*[^#]*:latest\b' "$f" || true)
+  if [ -n "$hits" ]; then
+    echo "check-no-latest: ':latest' image tag in $f"
+    echo "$hits" | sed 's/^/    /'
+    status=1
+  fi
+done <<< "$files"
+
+if [ "$status" -ne 0 ]; then
+  echo "check-no-latest: FAILED — pin every image to an immutable tag."
+fi
+exit "$status"

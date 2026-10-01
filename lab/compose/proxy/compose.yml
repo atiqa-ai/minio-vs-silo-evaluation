@@ -1,0 +1,59 @@
+# Load-balancer project — nginx reverse proxy in front of each cluster.
+#
+# Separate upstream blocks for MinIO and Silo. These are the only services, other
+# than the node consoles, that publish a port, and every published port is bound
+# to 127.0.0.1 (SRD 4.4).
+#
+# The two upstreams are byte-identical apart from hostname and port, so the proxy
+# is not a variable between the MinIO and Silo benchmark runs (guardrails 6).
+#
+# Note on benchmark endpoints: ST04/ST08 drive load through this proxy, because
+# SRD 5 specifies a load-balancer container as part of the reference topology.
+# Both products are measured through an identical proxy path.
+
+name: proxy
+
+x-proxy-common: &proxy-common
+  image: ${PROXY_IMAGE}
+  restart: unless-stopped
+  networks: [migration-net]
+  # No depends_on: the clusters belong to the minio and silo projects, and
+  # Compose cannot express dependencies across projects. Start order is
+  # enforced by tools/bin/lab up (clusters healthy first, then proxy), which is
+  # also the order documented in the ST01 runbook.
+  deploy:
+    resources:
+      limits:
+        cpus: "0.30"
+        memory: "128m"
+  healthcheck:
+    # nginx:alpine has busybox wget but no curl. /healthz is served by nginx
+    # itself and never touches an upstream, so this check stays meaningful even
+    # while every backend node is down.
+    test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/healthz || exit 1"]
+    interval: 10s
+    timeout: 5s
+    retries: 3
+    start_period: 5s
+
+services:
+  lb-minio:
+    <<: *proxy-common
+    container_name: lb-minio
+    volumes:
+      - ./nginx-minio.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "${BIND_ADDR}:${MINIO_PROXY_PORT}:80"
+
+  lb-silo:
+    <<: *proxy-common
+    container_name: lb-silo
+    volumes:
+      - ./nginx-silo.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "${BIND_ADDR}:${SILO_PROXY_PORT}:80"
+
+networks:
+  migration-net:
+    external: true
+    name: migration-net

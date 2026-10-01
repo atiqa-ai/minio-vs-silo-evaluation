@@ -1,0 +1,35 @@
+Id: sha256:f71deba3825f2a57b4ab348b34aeec2fd1004c852f9d502f4d43dd17f7f4747a
+REPOSITORY       TAG                            DIGEST                                                                    IMAGE ID       CREATED          SIZE
+minio-ce-local   RELEASE.2025-10-15T17-29-55Z   sha256:f71deba3825f2a57b4ab348b34aeec2fd1004c852f9d502f4d43dd17f7f4747a   f71deba3825f   23 minutes ago   183MB
+
+--- declared in compose ---
+51:MINIO_IMAGE=minio-ce-local:RELEASE.2025-10-15T17-29-55Z
+
+--- build provenance ---
+MinIO CE baseline image — provenance chain
+recorded: 2026-10-01T18:13:22+00:00
+reason:   no upstream MinIO CE image is obtainable (Docker Hub 404, quay 401)
+
+upstream_repository   https://github.com/minio/minio
+upstream_release_tag  RELEASE.2025-10-15T17-29-55Z
+upstream_commit       9e49d5e7a648f00e26f2246f4dc28e6b07f8c84a
+go_toolchain          go version go1.24.13 linux/amd64
+build_flags           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 -tags kqueue -trimpath
+ldflags_generator     buildscripts/gen-ldflags.go (upstream mechanism, MINIO_RELEASE=RELEASE)
+binary_sha256         15d7d777ed553352ff09a94ab4d5a0608aecb90448f1a5c8e7f2385eda8c32a9
+binary_size_bytes     110997688
+binary_version_line   minio version RELEASE.2025-10-15T17-29-55Z (commit-id=9e49d5e7a648f00e26f2246f4dc28e6b07f8c84a)
+base_image            registry.access.redhat.com/ubi9/ubi-micro@sha256:932aec77f5b86a5dba854a18b14a38725b296967e7dc9c7a1f4d7f0bf82e1ce5
+base_image_reason     same base as the Silo image, for Identical-Test Rule compliance
+entrypoint_source     dockerscripts/docker-entrypoint.sh (verbatim from the RELEASE tree)
+local_image_tag       minio-ce-local:RELEASE.2025-10-15T17-29-55Z
+local_image_id        sha256:f71deba3825f2a57b4ab348b34aeec2fd1004c852f9d502f4d43dd17f7f4747a
+local_image_digest    minio-ce-local@sha256:f71deba3825f2a57b4ab348b34aeec2fd1004c852f9d502f4d43dd17f7f4747a
+
+--- binary self-reported version ---
+minio version RELEASE.2025-10-15T17-29-55Z (commit-id=9e49d5e7a648f00e26f2246f4dc28e6b07f8c84a)
+Runtime: go1.24.13 linux/amd64
+License: GNU AGPLv3 - https://www.gnu.org/licenses/agpl-3.0.html
+Copyright: 2015-2025 MinIO, Inc.
+
+# exit status: 0

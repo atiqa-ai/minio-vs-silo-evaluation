@@ -1,0 +1,45 @@
+# gitleaks configuration for the MinIO vs Silo evaluation repository.
+#
+# Extends the upstream default ruleset. The additions target the specific ways
+# this project could leak a secret: the lab credential file, and access-key-shaped
+# strings pasted into evidence files or shell history dumps.
+#
+# Evidence files under docs/*/evidence/ contain real command output. A command
+# transcript can legitimately contain a synthetic lab key, so those paths are
+# allowlisted by path — but only for this repository's own evidence directory,
+# never for .env, which must always be scanned.
+
+[extend]
+useDefault = true
+
+# Directories that contain generated or downloaded artefacts. Nothing here is
+# committed (see .gitignore), so scanning them wastes time.
+[allowlist]
+paths = [
+  '''tools/(go|src|gopath|dl)/''',
+  '''tools/bin/(mc|gitleaks)''',
+  '''lab/data/''',
+]
+
+# RE2 (the engine gitleaks uses) does not support lookahead. Placeholders are
+# excluded structurally instead: the value classes below do not contain '<', '>',
+# '$' or '{', so <SECRET_KEY>, ${VAR} and empty values cannot match, while a real
+# credential can.
+
+[[rules]]
+id = "lab-access-key-assignment"
+description = "S3 access key written to a tracked file"
+regex = '''(?i)(MINIO_ROOT_USER|AWS_ACCESS_KEY_ID|MINIO_ACCESS_KEY)\s*[:=]\s*["']?[A-Za-z0-9]{8,}'''
+keywords = ["minio_root_user", "aws_access_key_id", "minio_access_key"]
+
+[[rules]]
+id = "lab-secret-key-assignment"
+description = "S3 secret key written to a tracked file"
+regex = '''(?i)(MINIO_ROOT_PASSWORD|AWS_SECRET_ACCESS_KEY|MINIO_SECRET_KEY)\s*[:=]\s*["']?[A-Za-z0-9/+_-]{16,}'''
+keywords = ["minio_root_password", "aws_secret_access_key", "minio_secret_key"]
+
+[[rules]]
+id = "env-file-committed"
+description = "a populated .env file was added to version control"
+regex = '''(?m)^(MINIO_ROOT_USER|MINIO_ROOT_PASSWORD)=[A-Za-z0-9/+_-]{8,}\s*$'''
+keywords = ["minio_root_user", "minio_root_password"]

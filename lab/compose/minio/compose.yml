@@ -1,0 +1,84 @@
+# MinIO CE baseline cluster — 4 nodes x 1 drive, single erasure pool.
+#
+# Reference topology from SRD 5 Profile B (4 nodes x 1 drive + load-balancer).
+# Silo gets an identical file in ../silo/compose.yml: same node count, same
+# drive count, same CPU/memory limits, same volume type, same bind-mount layout.
+# Only the image and the server binary differ. Any drift between the two files
+# would invalidate the ST08 comparison, so keep them in step.
+#
+# Ports: only the CONSOLE of node 1 is published, bound to 127.0.0.1 (SRD 4.4).
+# The S3 API (9000) is deliberately NOT published; clients reach it over
+# migration-net, either directly or through the proxy project's load balancer.
+
+name: minio-cluster
+
+x-minio-common: &minio-common
+  image: ${MINIO_IMAGE}
+  restart: unless-stopped
+  networks: [migration-net]
+  # Identical limits on every node; the Silo cluster matches exactly.
+  deploy:
+    resources:
+      limits:
+        cpus: "${NODE_CPUS}"
+        memory: ${NODE_MEM}
+  environment: &minio-env
+    MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+    MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    # Same credential-file variable names Silo's image bakes in, so ST07 can test
+    # whether MinIO and Silo interpret the same MINIO_* surface identically.
+    MINIO_BROWSER_REDIRECT_URL: ""
+  healthcheck:
+    # ubi-micro has no curl and no wget. bash's /dev/tcp gives a real TCP probe
+    # without adding a package manager to the image.
+    test: ["CMD-SHELL", "timeout 3 bash -c 'cat < /dev/null > /dev/tcp/127.0.0.1/9000' || exit 1"]
+    interval: 10s
+    timeout: 5s
+    retries: 12
+    start_period: 20s
+  command: &minio-command
+    - server
+    - --address
+    - ":9000"
+    - --console-address
+    - ":9001"
+    - http://minio-1:9000/data
+    - http://minio-2:9000/data
+    - http://minio-3:9000/data
+    - http://minio-4:9000/data
+
+services:
+  minio-1:
+    <<: *minio-common
+    container_name: minio-1
+    volumes:
+      - ../../data/minio/node-1:/data
+    ports:
+      - "${BIND_ADDR}:${MINIO_CONSOLE_PORT}:9001"
+    command: *minio-command
+
+  minio-2:
+    <<: *minio-common
+    container_name: minio-2
+    volumes:
+      - ../../data/minio/node-2:/data
+
+  minio-3:
+    <<: *minio-common
+    container_name: minio-3
+    volumes:
+      - ../../data/minio/node-3:/data
+
+  minio-4:
+    <<: *minio-common
+    container_name: minio-4
+    volumes:
+      - ../../data/minio/node-4:/data
+
+# One shared network for the whole lab (SRD 4.4), created outside Compose with
+# `docker network create migration-net` so every component project joins the same
+# network. Declared external because Compose must not own or recreate it.
+networks:
+  migration-net:
+    external: true
+    name: migration-net

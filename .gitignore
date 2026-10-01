@@ -1,0 +1,54 @@
+# ---------------------------------------------------------------------------
+# Toolchains, sources and downloaded artefacts
+# ---------------------------------------------------------------------------
+# Reproduced by tools/bin/build-minio.sh, not committed. See
+# docs/01-repository-and-lab/evidence/minio-build-provenance.txt.
+tools/go/
+tools/gopath/
+tools/src/
+tools/dl/
+
+# Vendored binaries. Each is checksum-verified at install time and the checksum
+# is recorded in the evidence, so the file itself does not belong in git.
+tools/bin/mc
+tools/bin/gitleaks
+
+# Compiled/staged build inputs. The MinIO binary is ~106 MB.
+lab/images/minio/minio
+lab/images/mc/mc
+
+# Generic archive pattern, in case a new artefact is downloaded.
+*.tar.gz
+*.tgz
+*.zip
+
+# ---------------------------------------------------------------------------
+# Lab credentials — must never be committed (guardrails 20)
+# ---------------------------------------------------------------------------
+# .env.example IS tracked and holds placeholders only.
+lab/compose/.env
+.env
+.env.local
+*.env
+!*.env.example
+
+# ---------------------------------------------------------------------------
+# Cluster data and runtime state
+# ---------------------------------------------------------------------------
+# MinIO and Silo write as root inside these bind mounts, so cleanup needs a
+# container (see the ST12 runbook) rather than a host rm.
+lab/data/
+lab/logs/
+
+# ---------------------------------------------------------------------------
+# Docker volumes created by the workload project
+# ---------------------------------------------------------------------------
+mc-config/
+silo-config/
+
+# ---------------------------------------------------------------------------
+# Editor and OS noise
+# ---------------------------------------------------------------------------
+.DS_Store
+*.swp
+*~

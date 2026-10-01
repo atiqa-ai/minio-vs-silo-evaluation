@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+# ST01 - Repository and Lab verification.
+#
+# Runs TC-ST01-01 .. TC-ST01-08 and writes the raw command output for each one to
+# docs/01-repository-and-lab/evidence/. Nothing is interpreted here: this script
+# only records what the commands printed. Pass/fail judgement belongs in the
+# ST01 README, next to the evidence it cites.
+#
+# Usage: st01-verify [minio|silo]
+#
+# The suffix names the evidence set, because guardrails 15 forbids running both
+# heavy stacks at once: the MinIO baseline pass and the Silo pass are captured
+# separately rather than from one mixed run.
+
+set -uo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$HERE/../.." && pwd)"
+SUFFIX="${1:-minio}"
+case "$SUFFIX" in
+  minio) NODES="minio-1 minio-2 minio-3 minio-4"; PROJECT=minio-cluster ;;
+  silo)  NODES="silo-1 silo-2 silo-3 silo-4";   PROJECT=silo-cluster ;;
+  *)     die "usage: st01-verify [minio|silo]" ;;
+esac
+EV="$ROOT/docs/01-repository-and-lab/evidence"
+ENV_FILE="$ROOT/lab/compose/.env"
+
+mkdir -p "$EV"
+stamp() { date -u '+%Y-%m-%dT%H:%M:%SZ'; }
+hdr() {
+  printf '# %s\n# command: %s\n# captured: %s\n# host: %s\n\n' \
+    "$1" "$2" "$(stamp)" "$(hostname)" >&2
+}
+
+run() {
+  local tc="$1"
+  local title="$2"
+  local cmd="$3"
+  local file="$EV/${tc}-${SUFFIX}.txt"
+  { hdr "$tc ($SUFFIX) — $title" "$cmd"
+    bash -c "$cmd" 2>&1
+    printf '\n# exit status: %s\n' "$?"
+  } > "$file"
+  printf '  %-12s %-6s -> evidence/%s\n' "$tc" "$SUFFIX" "$(basename "$file")"
+}
+
+die() { printf 'st01-verify: %s\n' "$*" >&2; exit 1; }
+
+echo "ST01 verification starting"
+
+# Docker populates container port metadata asynchronously after a container
+# reports as started. Capturing too early yields evidence that contradicts the
+# live state (an empty port list for a container that is in fact publishing).
+# Guardrails 14 requires evidence to reflect reality, so settle first.
+sleep 5
+
+# ---------------------------------------------------------------- TC-ST01-01
+run TC-ST01-01 "Verify Docker environment" \
+  'docker version; echo; docker info --format "Server Version: {{.ServerVersion}}"; docker info --format "Driver: {{.Driver}}"; docker info --format "Cgroup Driver: {{.CgroupDriver}}"; docker info --format "Cgroup Version: {{.CgroupVersion}}"; docker info --format "Total CPUs: {{.NCPU}}"; docker info --format "Total Memory: {{.MemTotal}}"; docker info --format "Storage Driver: {{.Driver}}"; docker info --format "Docker Root Dir: {{.DockerRootDir}}"; echo; echo "--- storage ---"; docker system df; echo; echo "--- data root ---"; df -h / /var/lib/docker 2>&1'
+
+# ---------------------------------------------------------------- TC-ST01-02
+run TC-ST01-02 "Verify Docker Compose v2" \
+  'docker compose version; echo; echo "--- plugin detail ---"; docker info --format "{{range .ClientInfo.Plugins}}{{.Name}}: {{.Version}}{{println}}{{end}}" 2>/dev/null | grep -i compose; echo; echo "--- config validity, all projects ---"; for d in minio silo proxy workload; do printf "%s: " "$d"; (cd '"$ROOT"'/lab/compose/$d && docker compose --env-file ../.env config -q && echo VALID) || echo INVALID; done'
+
+# ---------------------------------------------------------------- TC-ST01-03
+run TC-ST01-03 "Verify pinned MinIO image and digest" \
+  'docker image inspect minio-ce-local:RELEASE.2025-10-15T17-29-55Z --format "Id: {{.Id}}"; docker images --digests minio-ce-local; echo; echo "--- declared in compose ---"; grep -n "MINIO_IMAGE" '"$ROOT"'/lab/compose/.env; echo; echo "--- build provenance ---"; cat '"$ROOT"'/docs/01-repository-and-lab/evidence/minio-build-provenance.txt; echo; echo "--- binary self-reported version ---"; docker exec minio-1 minio --version 2>&1 || docker run --rm minio-ce-local:RELEASE.2025-10-15T17-29-55Z minio --version 2>&1'
+
+# ---------------------------------------------------------------- TC-ST01-04
+run TC-ST01-04 "Verify pinned Silo image and digest" \
+  'docker image inspect pgsty/silo:RELEASE.2026-09-16T00-00-00Z --format "Id: {{.Id}}"; docker images --digests pgsty/silo; echo; echo "--- declared in compose ---"; grep -n "SILO_IMAGE" '"$ROOT"'/lab/compose/.env; echo; echo "--- runtime versions from the image ---"; docker run --rm --entrypoint silo pgsty/silo:RELEASE.2026-09-16T00-00-00Z --version 2>&1; echo; docker run --rm --entrypoint silo pgsty/silo:RELEASE.2026-09-16T00-00-00Z --commit 2>&1; echo; echo "--- bundled mcli ---"; docker run --rm --entrypoint mcli pgsty/silo:RELEASE.2026-09-16T00-00-00Z --version 2>&1; docker run --rm --entrypoint mcli pgsty/silo:RELEASE.2026-09-16T00-00-00Z --commit 2>&1'
+
+# ---------------------------------------------------------------- TC-ST01-05
+run TC-ST01-05 "Verify migration-net" \
+  'docker network ls | grep -w migration-net; echo; docker network inspect migration-net --format "Name: {{.Name}}"; docker network inspect migration-net --format "Driver: {{.Driver}}"; docker network inspect migration-net --format "Scope: {{.Scope}}"; docker network inspect migration-net --format "Internal: {{.Internal}}"; echo; echo "--- attached containers ---"; docker network inspect migration-net --format "{{range .Containers}}{{.Name}}  {{.IPv4Address}}{{println}}{{end}}"; echo "--- networks used by every lab container (must be exactly one: migration-net) ---"; for c in minio-1 minio-2 minio-3 minio-4 mc-client silo-client; do printf "%s: " "$c"; docker inspect -f "{{range \$k,\$v := .NetworkSettings.Networks}}{{\$k}} {{end}}" "$c" 2>/dev/null || echo "(absent)"; done'
+
+# ---------------------------------------------------------------- TC-ST01-06
+run TC-ST01-06 "Verify Compose projects and required connectivity" \
+  'echo "evidence set: '"$SUFFIX"'  (nodes: '"$NODES"')"; echo; echo "--- compose projects present ---"; docker compose ls --all; echo; echo "--- cluster '"$SUFFIX"', all nodes healthy ---"; docker ps --filter "label=com.docker.compose.project='"$PROJECT"'" --format "{{.Names}}\t{{.Status}}"; echo; echo "--- raw TCP reachability from a workload container to every node ---"; for n in '"$NODES"'; do printf "%s:9000 " "$n"; docker exec mc-client bash -c "timeout 3 bash -c \"cat < /dev/null > /dev/tcp/$n/9000\"" 2>/dev/null && echo reachable || echo UNREACHABLE; done; echo; echo "--- S3 API via mc, same binary for both products ---"; docker exec mc-client mc --no-color admin info '"$SUFFIX"' 2>&1 | grep -E "●|Version:|Network:|Drives:|Pool:|drive online"; echo; echo "--- the other product'"'"'s client container can also reach this cluster (shared network) ---"; if [ "'"$SUFFIX"'" = minio ]; then C=silo-client; else C=mc-client; fi; N=$(echo '"$NODES"' | awk "{print \$1}"); docker exec "$C" bash -c "timeout 3 bash -c \"cat < /dev/null > /dev/tcp/$N/9000\"" 2>/dev/null && echo "$C -> $N:9000 reachable" || echo "$C -> $N:9000 UNREACHABLE"; echo; echo "--- DNS resolution of node names from a workload container ---"; docker exec mc-client bash -c "for n in '"$NODES"'; do printf \"\$n -> \"; getent hosts \$n 2>/dev/null || echo UNRESOLVED; done"'
+
+# ---------------------------------------------------------------- TC-ST01-07
+run TC-ST01-07 "Verify only required consoles/proxy publish ports" \
+  'echo "--- published ports of every lab container (blank = none published) ---"; for c in minio-1 minio-2 minio-3 minio-4 silo-1 silo-2 silo-3 silo-4 lb-minio lb-silo mc-client silo-client; do printf "%-12s " "$c"; if docker inspect "$c" >/dev/null 2>&1; then docker port "$c" 2>&1 | tr "\n" " "; echo; else echo "(container not running)"; fi; done; echo; echo "--- anything published by non-lab containers (must be pre-existing, not this project) ---"; docker ps --format "{{.Names}}\t{{.Ports}}"; echo; echo "--- compose declared port mappings ---"; grep -rn "ports:" -A3 '"$ROOT"'/lab/compose/*/compose.yml'
+
+# ---------------------------------------------------------------- TC-ST01-08
+# Scoped to containers owned by THIS project. A host-wide wildcard check would
+# fail on ports held by unrelated pre-existing containers (cadvisor binds
+# 0.0.0.0:8080, grafana binds 0.0.0.0:3001) and would report a guardrail failure
+# that this project did not cause and must not fix. Only the lab's own published
+# ports are asserted here.
+run TC-ST01-08 "Verify published ports bind to 127.0.0.1" \
+  'echo "--- lab bind addresses, from container inspect (authoritative) ---"; ports=0; for c in minio-1 silo-1 lb-minio lb-silo; do docker inspect "$c" >/dev/null 2>&1 || continue; printf "[%s]\n" "$c"; docker inspect -f "{{json .NetworkSettings.Ports}}" "$c"; done; echo; echo "--- assert every lab published port binds to 127.0.0.1 ---"; bad=0; seen=0; for c in minio-1 silo-1 lb-minio lb-silo; do docker inspect "$c" >/dev/null 2>&1 || continue; docker inspect -f "{{range \$p,\$b := .NetworkSettings.Ports}}{{range \$b}}{{.HostIp}} {{.HostPort}}{{\"\n\"}}{{end}}{{end}}" "$c" | while read -r ip port; do [ -z "${port:-}" ] && continue; echo "  $c -> $ip:$port"; done; done; echo; echo "--- listening sockets for lab ports only ---"; for p in '"$ROOT"'/ports; do :; done; P=$(grep -E "^(MINIO_CONSOLE_PORT|SILO_CONSOLE_PORT|MINIO_PROXY_PORT|SILO_PROXY_PORT)=" '"$ROOT"'/lab/compose/.env | cut -d= -f2 | paste -sd"|"); echo "  lab ports from .env: $P"; (ss -ltn 2>/dev/null || netstat -ltn) | grep -E ":($P)[[:space:]]" | sed "s/^/  /"; echo; echo "--- assert none of the lab ports is wildcard-bound ---"; if (ss -ltn 2>/dev/null || netstat -ltn) | grep -E "0\.0\.0\.0:($P)[[:space:]]|\*:($P)[[:space:]]"; then echo "  FAIL: a lab port is wildcard-bound"; else echo "  OK: every lab port is bound to a loopback address only"; fi; echo; echo "--- unrelated pre-existing containers (recorded for context, NOT this project) ---"; for c in grafana cadvisor nginx-exporter; do printf "  %-16s " "$c"; docker port "$c" 2>/dev/null | tr "\n" " "; echo; done; echo; echo "--- BIND_ADDR in .env ---"; grep -n "BIND_ADDR" '"$ROOT"'/lab/compose/.env'
+
+echo
+echo "ST01 verification complete. Evidence written to docs/01-repository-and-lab/evidence/"
+ls -1 "$EV"
