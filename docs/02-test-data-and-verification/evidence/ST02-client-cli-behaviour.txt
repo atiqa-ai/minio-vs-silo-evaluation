@@ -1,0 +1,42 @@
+Client CLI behaviour measured while building the ST02 toolkit
+recorded_utc: 2026-10-01T19:54:15Z
+client: mc version RELEASE.2025-08-13T08-35-41Z (commit-id=7394ce0dd2a80935aded936b09fa12cbb3cb8096)
+
+### 9.3 object tag separators (mc against the MinIO cluster)
+
+--- input: a=1
+Tags set for http://minio-1:9000/tagprobe/t.bin.
+stored: {"tagset":{"a":"1"},"status":"success","url":"http://minio-1:9000/tagprobe/t.bin","versionID":""}
+
+--- input: a=1,b=2
+mc: <ERROR> Failed to set tags for http://minio-1:9000/tagprobe/t.bin. The TagValue you have provided is invalid.
+stored: {"tagset":{"a":"1"},"status":"success","url":"http://minio-1:9000/tagprobe/t.bin","versionID":""}
+
+--- input: a=1&b=2
+Tags set for http://minio-1:9000/tagprobe/t.bin.
+stored: {"tagset":{"a":"1","b":"2"},"status":"success","url":"http://minio-1:9000/tagprobe/t.bin","versionID":""}
+
+--- input: a=1 b=2
+Tags set for http://minio-1:9000/tagprobe/t.bin.
+stored: {"tagset":{"a":"1 b=2"},"status":"success","url":"http://minio-1:9000/tagprobe/t.bin","versionID":""}
+
+--- input: a=1;b=2
+mc: <ERROR> Failed to set tags for http://minio-1:9000/tagprobe/t.bin. The TagValue you have provided is invalid.
+stored: {"tagset":{"a":"1 b=2"},"status":"success","url":"http://minio-1:9000/tagprobe/t.bin","versionID":""}
+
+### mc cp --tags behaviour
+
+--- repeated --tags flags (k1 then k2)
+{"tagset":{"k2":"v2"},"status":"success","url":"http://minio-1:9000/tagprobe/r.bin","versionID":""}
+
+### 9.4 metadata separators (mc cp --attr)
+
+--- comma
+X-Amz-Meta-A: 1,b=2
+
+--- semicolon
+X-Amz-Meta-A: 1
+X-Amz-Meta-B: 2
+
+--- repeated --attr
+X-Amz-Meta-B: 2

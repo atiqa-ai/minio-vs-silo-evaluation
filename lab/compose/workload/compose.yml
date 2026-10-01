@@ -32,6 +32,13 @@ services:
       HOME: /tmp
     volumes:
       - mc-config:/config
+      # The synthetic dataset, read-only. Both products are seeded from this same
+      # directory, which is how the Identical-Test Rule is satisfied without ever
+      # copying data between the two products (guardrails 11).
+      - ../../data/dataset:/dataset:ro
+      # Job scripts, so verification logic lives in the repository rather than
+      # being pasted into shell history.
+      - ../../tools:/tools:ro
     working_dir: /work
 
   # Silo client tooling: mcli (and mc, which Silo still accepts) against Silo.
@@ -46,6 +53,8 @@ services:
       HOME: /tmp
     volumes:
       - silo-config:/config
+      - ../../data/dataset:/dataset:ro
+      - ../../tools:/tools:ro
     working_dir: /work
 
 volumes:

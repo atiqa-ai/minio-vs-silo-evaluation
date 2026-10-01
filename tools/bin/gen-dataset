@@ -1,0 +1,261 @@
+#!/usr/bin/env python3
+"""Generate the synthetic evaluation dataset.
+
+Guardrails 7 / SRD: only synthetic test data. Nothing here is derived from real
+data, and the generator reads no external input.
+
+Determinism matters more than realism. The Identical-Test Rule (guardrails 6)
+requires MinIO and Silo to be tested against the same test data. Rather than
+uploading one dataset twice and copying 2 GB through a network path that
+guardrails 11 forbids, both products are seeded from this generator, which
+produces byte-identical output on every run. That property is asserted, not
+assumed: --verify-deterministic regenerates a sample and compares digests.
+
+Byte content comes from a SHA-256 counter-mode keystream, seeded from the object
+name. This keeps generation fast for large objects and guarantees no long runs of
+repeated or zero bytes, which would make compression behaviour unrepresentative.
+
+Usage:
+  gen-dataset --out DIR [--profile full|smoke]
+  gen-dataset --out DIR --verify-deterministic
+"""
+
+import argparse
+import hashlib
+import json
+import os
+import shutil
+import sys
+
+# ---------------------------------------------------------------- keystream
+
+# 8 MiB counter-mode keystream. Regenerated once and sliced per object.
+KEYSTREAM_BYTES = 8 * 1024 * 1024
+
+
+def build_keystream(seed: str) -> bytes:
+    """SHA-256 in counter mode: K[i] = SHA256(seed || i)."""
+    seed_b = seed.encode()
+    out = bytearray()
+    i = 0
+    while len(out) < KEYSTREAM_BYTES:
+        out += hashlib.sha256(seed_b + b"|" + str(i).encode()).digest()
+        i += 1
+    return bytes(out[:KEYSTREAM_BYTES])
+
+
+def object_bytes(keystream: bytes, key: str, size: int) -> bytes:
+    """Deterministic content for one object.
+
+    The per-object start offset is derived from the key so that two objects of
+    the same size never share identical content, even though they draw from the
+    same keystream.
+    """
+    if size == 0:
+        return b""
+    off = int.from_bytes(hashlib.sha256(key.encode()).digest()[:8], "big")
+    off %= KEYSTREAM_BYTES
+    reps = (off + size + KEYSTREAM_BYTES - 1) // KEYSTREAM_BYTES
+    buf = keystream[off:] + keystream * (reps - 1)
+    return buf[:size]
+
+
+# ---------------------------------------------------------------- catalogue
+
+# (prefix, count, size_spec, purpose)
+# size_spec: (min_bytes, max_bytes) chosen deterministically per index.
+PROFILES = {
+    # Full dataset. Total is computed and written to the manifest rather than
+    # assumed, because the actual total determines how long seeding takes and
+    # whether both datasets fit on the host alongside the images.
+    "full": [
+        ("small", 500, (4 * 1024, 64 * 1024), "small-object throughput and LIST depth"),
+        ("medium", 100, (1024 * 1024, 1024 * 1024), "general mixed workload"),
+        ("large", 6, (128 * 1024 * 1024, 128 * 1024 * 1024), "large-object throughput"),
+        ("nested/a/b/c/d", 40, (8 * 1024, 64 * 1024), "nested prefix and LIST behaviour"),
+        ("empty", 3, (0, 0), "zero-byte object edge case"),
+        ("unicode/ünïcödé/δοκιμή", 12, (1 * 1024, 16 * 1024), "non-ASCII key handling"),
+        ("special/chars with spaces+plus", 8, (1 * 1024, 8 * 1024), "key characters needing quoting"),
+    ],
+    # Fast subset for smoke-testing the pipeline itself.
+    "smoke": [
+        ("small", 10, (4 * 1024, 16 * 1024), "small-object throughput and LIST depth"),
+        ("medium", 4, (256 * 1024, 1024 * 1024), "general mixed workload"),
+        ("empty", 2, (0, 0), "zero-byte object edge case"),
+    ],
+}
+
+SEED = "minio-vs-silo-evaluation/ST02"
+
+# Retention is deliberately mixed, and includes both modes. GOVERNANCE mode can
+# be bypassed by a privileged user; COMPLIANCE mode cannot. A migration that
+# silently downgrades COMPLIANCE to GOVERNANCE would be invisible here unless
+# the manifest records it, so retention is one of the manifest's required fields.
+RETENTIONS = [
+    ("GOVERNANCE", "1d"),
+    ("GOVERNANCE", "7d"),
+    ("COMPLIANCE", "1d"),
+    ("COMPLIANCE", "30d"),
+]
+
+TAG_SETS = [
+    ["project=evaluation", "tier=baseline"],
+    ["project=evaluation", "tier=comparison", "shape=small"],
+    ["project=evaluation", "shape=large"],
+    ["env=lab", "synthetic=true"],
+]
+
+META_KEYS = ["purpose", "generator", "profile", "index"]
+
+
+def build_plan(profile: str):
+    """Expand a profile into a deterministic ordered list of object specs."""
+    plan = []
+    for prefix, count, (lo, hi), purpose in PROFILES[profile]:
+        for i in range(count):
+            # Size is a deterministic function of the index so that regenerating
+            # produces exactly the same object set.
+            if lo == hi:
+                size = lo
+            else:
+                h = hashlib.sha256(f"{prefix}|{i}".encode()).digest()
+                size = lo + (int.from_bytes(h[:8], "big") % (hi - lo + 1))
+            key = f"{prefix}/{i:05d}.bin"
+            retention = RETENTIONS[i % len(RETENTIONS)]
+            tags = TAG_SETS[i % len(TAG_SETS)]
+            plan.append(
+                {
+                    "key": key,
+                    "size": size,
+                    "purpose": purpose,
+                    "retention_mode": retention[0],
+                    "retention_days": int(retention[1][:-1]),
+                    "tags": tags,
+                    "metadata": {
+                        "purpose": purpose.replace(" ", "-"),
+                        "generator": "gen-dataset",
+                        "profile": profile,
+                        "index": str(i),
+                    },
+                }
+            )
+    return plan
+
+
+def generate(out: str, profile: str, quiet: bool = False):
+    plan = build_plan(profile)
+    ks = build_keystream(SEED)
+
+    if os.path.exists(out):
+        shutil.rmtree(out)
+    os.makedirs(out, exist_ok=True)
+
+    manifest_path = os.path.join(out, "dataset-manifest.jsonl")
+    total = 0
+    with open(manifest_path, "w", encoding="utf-8") as mf:
+        for spec in plan:
+            dest = os.path.join(out, spec["key"].replace("/", os.sep))
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            data = object_bytes(ks, spec["key"], spec["size"])
+            with open(dest, "wb") as f:
+                f.write(data)
+            digest = hashlib.sha256(data).hexdigest()
+            total += spec["size"]
+            row = {
+                "key": spec["key"],
+                "size": spec["size"],
+                "sha256": digest,
+                "md5": hashlib.md5(data).hexdigest(),
+                "tags": spec["tags"],
+                "metadata": spec["metadata"],
+                "retention_mode": spec["retention_mode"],
+                "retention_days": spec["retention_days"],
+                "purpose": spec["purpose"],
+            }
+            mf.write(json.dumps(row, sort_keys=True) + "\n")
+
+    summary = {
+        "profile": profile,
+        "seed": SEED,
+        "object_count": len(plan),
+        "total_bytes": total,
+        "total_gib": round(total / (1024 ** 3), 3),
+        "manifest": manifest_path,
+    }
+    with open(os.path.join(out, "dataset-summary.json"), "w") as f:
+        json.dump(summary, f, indent=2, sort_keys=True)
+        f.write("\n")
+
+    if not quiet:
+        print(json.dumps(summary, indent=2, sort_keys=True))
+    return summary
+
+
+def verify_deterministic(out: str, profile: str, quiet: bool = False):
+    """Prove the generator is byte-reproducible.
+
+    Regenerates into a temporary directory and compares every object's SHA-256
+    against the existing manifest. The Identical-Test Rule depends on this, so it
+    is checked rather than taken on faith.
+    """
+    import tempfile
+
+    manifest_path = os.path.join(out, "dataset-manifest.jsonl")
+    if not os.path.exists(manifest_path):
+        print(f"verify: no manifest at {manifest_path}", file=sys.stderr)
+        return 1
+
+    with open(manifest_path, encoding="utf-8") as f:
+        original = {json.loads(l)["key"]: json.loads(l)["sha256"] for l in f}
+
+    tmp = tempfile.mkdtemp(prefix="gen-dataset-verify-")
+    try:
+        plan = build_plan(profile)
+        ks = build_keystream(SEED)
+        mismatch = 0
+        checked = 0
+        for spec in plan:
+            if spec["key"] not in original:
+                print(f"  MISMATCH: key absent from manifest: {spec['key']}")
+                mismatch += 1
+                continue
+            data = object_bytes(ks, spec["key"], spec["size"])
+            d = hashlib.sha256(data).hexdigest()
+            checked += 1
+            if d != original[spec["key"]]:
+                print(f"  MISMATCH: {spec['key']} {d} != {original[spec['key']]}")
+                mismatch += 1
+            if spec["size"] != os.path.getsize(
+                os.path.join(out, spec["key"].replace("/", os.sep))
+            ):
+                print(f"  SIZE MISMATCH: {spec['key']}")
+                mismatch += 1
+        result = {
+            "checked": checked,
+            "mismatches": mismatch,
+            "deterministic": mismatch == 0,
+        }
+        if not quiet:
+            print(json.dumps(result, indent=2, sort_keys=True))
+        return 0 if mismatch == 0 else 1
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--out", required=True, help="output directory")
+    ap.add_argument("--profile", default="full", choices=sorted(PROFILES))
+    ap.add_argument("--verify-deterministic", action="store_true",
+                    help="regenerate and compare digests instead of writing data")
+    ap.add_argument("--quiet", action="store_true")
+    args = ap.parse_args()
+
+    if args.verify_deterministic:
+        sys.exit(verify_deterministic(args.out, args.profile, args.quiet))
+    generate(args.out, args.profile, args.quiet)
+
+
+if __name__ == "__main__":
+    main()

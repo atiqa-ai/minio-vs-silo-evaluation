@@ -1,0 +1,142 @@
+#!/usr/bin/env bash
+# seed-dataset - upload the synthetic dataset into a locked bucket, then apply
+# per-object tags and retention.
+#
+# Both products are seeded by this identical script using the identical client
+# binary (mc), because the seed procedure itself must not be a variable
+# (Guardrail 11, Identical-Test Rule). Product-specific client behaviour is
+# measured separately in ST07, not here.
+#
+# Usage: tools/bin/seed-dataset <minio|silo> [bucket]
+set -euo pipefail
+
+PRODUCT="${1:-}"
+BUCKET="${2:-}"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+case "$PRODUCT" in
+  minio) CLIENT=mc-client ;;
+  silo)  CLIENT=silo-client ;;
+  *) echo "usage: $0 <minio|silo> [bucket]" >&2; exit 2 ;;
+esac
+ALIAS="$PRODUCT"
+[ -n "$BUCKET" ] || BUCKET="eval-seed"
+
+MANIFEST="$ROOT/lab/data/dataset/dataset-manifest.jsonl"
+PLAN="$ROOT/lab/data/dataset/seed-plan.tsv"
+[ -f "$MANIFEST" ] || { echo "missing manifest: run tools/bin/gen-dataset first" >&2; exit 1; }
+
+docker exec "$CLIENT" sh -c 'command -v mc >/dev/null 2>&1' || {
+  echo "ABORT: mc is not present in $CLIENT; seeding must use the same client for both products" >&2
+  exit 1
+}
+
+# Guard: refuse to run unless the target alias resolves to a network endpoint.
+# An unresolvable alias makes mc silently fall back to a *filesystem* client and
+# create local directories under /work instead of touching the server, which is
+# a silent data-integrity trap. Never let that happen again.
+endpoint=""
+for line in $(docker exec "$CLIENT" mc alias list "$ALIAS" 2>/dev/null); do
+  case "$line" in
+    *http://*|*https://*) endpoint="$line"; break ;;
+  esac
+done
+if [ -z "$endpoint" ]; then
+  echo "ABORT: alias '$ALIAS' does not resolve to an http(s) endpoint in $CLIENT." >&2
+  echo "       Refusing to run: mc would silently fall back to a filesystem client." >&2
+  exit 1
+fi
+echo "== seeding product=$PRODUCT alias=$ALIAS bucket=$BUCKET endpoint=$endpoint"
+
+# Object lock cannot be enabled on an existing bucket, and COMPLIANCE retention
+# cannot be shortened or overridden. Re-seeding in place would fail part-way and
+# leave the bucket unusable, so an existing bucket is a hard error.
+if docker exec "$CLIENT" mc ls "$ALIAS/$BUCKET" >/dev/null 2>&1; then
+  echo "ABORT: bucket $ALIAS/$BUCKET already exists." >&2
+  echo "       Object lock is immutable, so it cannot be added to an existing bucket." >&2
+  echo "       Pick a fresh bucket name. Note that a bucket holding COMPLIANCE-locked" >&2
+  echo "       objects cannot be removed for the life of the retention period, not even" >&2
+  echo "       with 'mc rb --force --dangerous', so each run needs a new name." >&2
+  exit 1
+fi
+
+# Create the bucket with object lock enabled at creation time. Object lock
+# cannot be added to a bucket afterwards (MinIO refuses it once the bucket
+# exists), so it must be requested here or not at all. Lock implies versioning.
+echo "== creating locked bucket $ALIAS/$BUCKET"
+docker exec "$CLIENT" mc mb "$ALIAS/$BUCKET" --with-lock 2>&1 | tail -1
+
+# Flatten JSON Lines to TSV. The client images ship no jq, awk or python, so the
+# transformation happens here and the container reads tab-separated text only.
+python3 - "$MANIFEST" "$PLAN" "${SEED_LIMIT:-0}" <<'PY'
+import json, sys
+src, dst, limit = sys.argv[1], sys.argv[2], int(sys.argv[3])
+with open(src) as fh, open(dst, "w") as out:
+    for n, line in enumerate(fh):
+        if limit and n >= limit:
+            break
+        o = json.loads(line)
+        # mc rejects the AWS comma-separated tag form and silently mis-parses a
+        # space-separated one into a single corrupted tag. '&' is the only
+        # separator both clients accept correctly.
+        tags = "&".join(o["tags"])
+        # mc cp --attr separates custom metadata with ';'. A comma joins the
+        # pairs into one header value, and repeating --attr keeps only the last.
+        meta = ";".join("X-Amz-Meta-%s=%s" % kv for kv in sorted(o["metadata"].items()))
+        out.write("\t".join([o["key"], meta, tags,
+                             o["retention_mode"].lower(), str(o["retention_days"])]) + "\n")
+PY
+plan_lines=$(wc -l < "$PLAN")
+echo "== plan: $plan_lines objects"
+
+# The upload loop runs inside the client container to keep round-trips local.
+# CONCURRENCY is a throttled pool built from bash job control because the image
+# has no xargs. Each worker appends one status line; O_APPEND writes shorter than
+# PIPE_BUF are atomic, so concurrent workers cannot interleave.
+if ! docker exec -i "$CLIENT" bash -s -- "$ALIAS" "$BUCKET" "$PRODUCT" "$plan_lines" <<'INNER'
+set -uo pipefail
+ALIAS="$1"; BUCKET="$2"; PRODUCT="$3"; EXPECTED="$4"
+PLAN=/dataset/seed-plan.tsv
+CONCURRENCY="${SEED_CONCURRENCY:-4}"
+STATUS=/tmp/seed-status.txt
+FAILLOG=/tmp/seed-failures.txt
+: > "$STATUS"; : > "$FAILLOG"
+
+upload_one() {
+  local key="$1" meta="$2" tags="$3" mode="$4" days="$5"
+  local target="$ALIAS/$BUCKET/$key" err
+  if ! err="$(mc cp --quiet --attr "$meta" "/dataset/$key" "$target" 2>&1)"; then
+    printf 'UPLOAD\t%s\t%s\n' "$key" "$err" >> "$FAILLOG"; printf 'f\t%s\n' "$key" >> "$STATUS"; return
+  fi
+  # Tags are set after upload: mc cp accepts only one --tags flag, and repeating
+  # the flag silently keeps only the last value.
+  if ! err="$(mc tag set "$target" "$tags" 2>&1)"; then
+    printf 'TAG\t%s\t%s\n' "$key" "$err" >> "$FAILLOG"; printf 'f\t%s\n' "$key" >> "$STATUS"; return
+  fi
+  if ! err="$(mc retention set "$mode" "${days}d" "$target" 2>&1)"; then
+    printf 'RETENTION\t%s\t%s\n' "$key" "$err" >> "$FAILLOG"; printf 'f\t%s\n' "$key" >> "$STATUS"; return
+  fi
+  printf 's\t%s\n' "$key" >> "$STATUS"
+}
+
+while IFS=$'\t' read -r key meta tags mode days; do
+  [ -n "$key" ] || continue
+  upload_one "$key" "$meta" "$tags" "$mode" "$days" &
+  while [ "$(jobs -r | wc -l)" -ge "$CONCURRENCY" ]; do wait -n || true; done
+done < "$PLAN"
+wait
+
+ok=$(while read -r c _; do [ "$c" = "s" ] && echo x; done < "$STATUS" | wc -l)
+bad=$(while read -r c _; do [ "$c" = "f" ] && echo x; done < "$STATUS" | wc -l)
+printf 'SEED_SUMMARY\tproduct=%s\texpected=%s\tok=%s\tfailed=%s\n' "$PRODUCT" "$EXPECTED" "$ok" "$bad"
+if [ -s "$FAILLOG" ]; then
+  printf -- '--- failures (up to 20) ---\n'
+  head -20 "$FAILLOG"
+fi
+[ "$ok" -eq "$EXPECTED" ]
+INNER
+then
+  echo "SEED FAILED - see failure list above" >&2
+  exit 1
+fi
+echo "== done"
