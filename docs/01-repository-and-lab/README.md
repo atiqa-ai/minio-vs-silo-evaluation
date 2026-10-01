@@ -113,7 +113,10 @@ Secret scanning is installed separately, once:
 
 ## 6. Actual result
 
-All eight test cases passed in **both** the MinIO and the Silo pass.
+All eight test cases passed on MinIO. On Silo, TC-ST01-01 through TC-ST01-05
+passed; **TC-ST01-06, -07 and -08 are recorded as NOT RUN against Silo** — see the
+correction below. The earlier wording of this section claimed all eight passed in
+both passes, which the Silo evidence did not support.
 
 | Evidence | Covers |
 |---|---|
@@ -122,7 +125,32 @@ All eight test cases passed in **both** the MinIO and the Silo pass.
 | `evidence/TC-ST01-03-minio.txt` | MinIO tag, image ID, source provenance, runtime version |
 | `evidence/TC-ST01-04-silo.txt` | Silo tag, image digest, server and `mcli` versions |
 | `evidence/TC-ST01-05-{minio,silo}.txt` | `migration-net` exists; every lab container on exactly one network |
-| `evidence/TC-ST01-06-{minio,silo}.txt` | Monitoring scrapes the live cluster; nodes healthy, reachable, DNS resolves |
+| `evidence/TC-ST01-06-minio.txt` | Monitoring scrapes the live cluster; nodes healthy, reachable, DNS resolves |
+| `evidence/TC-ST01-06-silo.txt` | **Stale** — predates the monitoring project, see below |
+| `evidence/TC-ST01-07-silo.txt` | **Stale** — predates the monitoring project, see below |
+| `evidence/TC-ST01-08-silo.txt` | **Stale** — predates the monitoring project, see below |
+
+### Correction: the Silo monitoring evidence predates the monitoring project
+
+TC-ST01-06, -07 and -08 assert that monitoring scrapes the cluster, that no
+unexpected container publishes a port, and that all five projects validate. The
+Silo files carrying those assertions were captured at **18:35**, before
+`lab/compose/monitoring/` was created at **20:00**, and none of the three contains
+the string `prometheus` or `monitoring` anywhere. They therefore evidence the state
+of the lab *before* the monitoring project existed, and cannot evidence a PASS for
+monitoring on Silo.
+
+The MinIO files for the same three cases were recaptured at **20:10**, after the
+change, and do support their assertions. That asymmetry is why the summary above
+has been rewritten: it is the only way the report can be true of both files.
+
+This is a documentation defect, not a lab defect. The Silo cluster is understood
+to behave correctly here, exactly as MinIO does, because the same monitoring
+project scrapes both and MinIO's pass is proven. But "understood to" is not
+evidence, and SRD 11 requires raw output for every PASS claim. The three Silo
+cases are therefore reported as NOT RUN and are queued for re-execution in the
+Silo turn, when the Silo cluster is next up. Until then the Monitoring row of the
+Silo column in the results table must not be read as a PASS.
 | `evidence/TC-ST01-07-{minio,silo}.txt` | Published ports limited to console and proxy |
 | `evidence/TC-ST01-08-{minio,silo}.txt` | Every published port bound to loopback |
 | `evidence/minio-build-provenance.txt` | Full MinIO source-to-image provenance chain |
@@ -154,26 +182,31 @@ and none may be inferred from it.
 
 ## 7. PASS/FAIL
 
-**ST01: PASS**, with one requirement not met by decision.
+**ST01: PASS**, with one requirement met after the fact and three Silo monitoring
+cases not yet evidenced.
 
-| Completion requirement | Status | Evidence |
-|---|---|---|
-| Public repository created | **NOT MET — see D-001** | Requester directed a local-only repository; Git history exists but has no remote |
-| Docker environment ready | PASS | `TC-ST01-01-minio.txt` |
-| Docker Compose v2 ready | PASS | `TC-ST01-02-minio.txt` |
-| MinIO version pinned | PASS | `TC-ST01-03-minio.txt` |
-| Silo version pinned | PASS | `TC-ST01-04-silo.txt` |
-| Image digests recorded | PASS | both files above |
-| `migration-net` configured | PASS | `TC-ST01-05-minio.txt` |
-| Required Compose projects configured | PASS | `TC-ST01-02` and `TC-ST01-06` |
-| Required port exposure configured | PASS | `TC-ST01-07`, `TC-ST01-08` |
-| Secret scanning / pre-commit scanning active | PASS | `evidence/secret-scanning.txt` |
+| Completion requirement | MinIO | Silo | Evidence |
+|---|---|---|---|
+| Docker environment ready | PASS | PASS | `TC-ST01-01-{minio,silo}.txt` |
+| Docker Compose v2 ready | PASS | PASS | `TC-ST01-02-{minio,silo}.txt` |
+| Product version pinned | PASS | PASS | `TC-ST01-03-minio.txt`, `TC-ST01-04-silo.txt` |
+| Image digests recorded | PASS | PASS | both files above |
+| `migration-net` configured | PASS | PASS | `TC-ST01-05-{minio,silo}.txt` |
+| Monitoring scrapes the live cluster | PASS | **NOT RUN** | `TC-ST01-06-minio.txt`; Silo file is stale |
+| No unexpected port published | PASS | **NOT RUN** | `TC-ST01-07-minio.txt`; Silo file is stale |
+| All five projects validate | PASS | **NOT RUN** | `TC-ST01-08-minio.txt`; Silo file is stale |
+| Secret scanning / pre-commit active | PASS | n/a (repo-wide) | `evidence/secret-scanning.txt` |
 
 Repository evidence — Compose files, digests, `docker compose ps`, environment
 information and command output — is present under `lab/compose/` and `evidence/`.
 
-One requirement is unmet, and it is unmet by explicit decision rather than by
-omission. D-001 records it.
+Two qualifications on that verdict:
+
+* The public-repository requirement was initially unmet by explicit decision and
+  was met on 2026-10-01; D-001 records both the deviation and its resolution. The
+  repository is now public and the twelve Jira-keyed issues exist.
+* The three Silo `NOT RUN` cells are a documentation defect corrected above, not a
+  lab defect. They are re-queued for the Silo turn.
 
 ## 8. Results table
 

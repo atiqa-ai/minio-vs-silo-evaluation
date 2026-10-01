@@ -66,15 +66,16 @@ Set up repository, pin versions and build the local Docker Compose lab.
 
 ### Completion Requirements
 
-* [ ] Public repository created — **NOT MET**, see `DEVIATIONS.md` D-001 (local-only repository by request; Git history exists, no remote configured)
+* [x] Public repository created — `https://github.com/atiqa-ai/minio-vs-silo-evaluation`, resolved 2026-10-01, see `DEVIATIONS.md` D-001
 * [x] Docker environment ready — `docs/01-repository-and-lab/evidence/TC-ST01-01-minio.txt`
 * [x] Docker Compose v2 ready — `evidence/TC-ST01-02-minio.txt`
 * [x] MinIO version pinned — `RELEASE.2025-10-15T17-29-55Z`, `evidence/TC-ST01-03-minio.txt`
 * [x] Silo version pinned — `RELEASE.2026-09-16T00-00-00Z`, `evidence/TC-ST01-04-silo.txt`
 * [x] Image digests recorded — all five images, `evidence/TC-ST01-03-minio.txt` and `TC-ST01-04-silo.txt`
 * [x] `migration-net` configured — `evidence/TC-ST01-05-{minio,silo}.txt`
-* [x] Required Compose projects configured — `lab/compose/{minio,silo,proxy,workload}/compose.yml`, `evidence/TC-ST01-06-{minio,silo}.txt`
-* [x] Required port exposure configured — `evidence/TC-ST01-07-{minio,silo}.txt`
+* [x] Required Compose projects configured — `lab/compose/{minio,silo,proxy,workload,monitoring}/compose.yml`, `evidence/TC-ST01-06-minio.txt`, `TC-ST01-02-{minio,silo}.txt`
+* [x] Monitoring project configured and scraping — **MinIO only**, `evidence/TC-ST01-06-minio.txt`
+* [ ] Monitoring, port exposure and project validation re-evidenced against Silo — `TC-ST01-06/07/08-silo.txt` were captured at 18:35, before `lab/compose/monitoring/` existed at 20:00, and contain no monitoring output. Re-queued for the Silo turn. Detail in `docs/01-repository-and-lab/README.md`
 * [x] Secret scanning/pre-commit scanning active — gitleaks 8.30.1 + `tools/bin/install-hooks`, `evidence/secret-scanning.txt`
 
 ### Evidence

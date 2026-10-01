@@ -53,3 +53,6 @@ silo-config/
 .DS_Store
 *.swp
 *~
+# Generated report output. tools/bin/build-docx.py is the source of truth; the
+# .docx is a build artefact and is regenerated on demand.
+docs/DEV-904-project-report.docx

@@ -11,6 +11,29 @@ deviation undermines.
 Status values: `Approved` (agreed with the requester before acting) or
 `Recorded` (necessary, discovered during work, and documented after the fact).
 
+Register summary:
+
+| ID | Subject | Status |
+|---|---|---|
+| D-001 | No public repository | Resolved 2026-10-01 |
+| D-002 | MinIO CE image built from source | Recorded |
+| D-003 | `mc` image built from release asset | Recorded |
+| D-004 | Host below Profile B, benchmarks indicative | Recorded |
+| D-005 | Dataset size, first pass under-sized | Resolved 2026-10-01 |
+| D-006 | O01–O08 derived from the SRD, not supplied | Recorded |
+| D-007 | Proxy ports moved off 8080 | Approved |
+| D-008 | Load balancers gated on cluster state | Recorded |
+| D-009 | Cluster data dirs are root-owned bind mounts | Recorded |
+| D-010 | `fio` and NFS moved into containers | Recorded, **tooling not yet built** |
+| D-011 | Go runtime differs between the servers | Recorded |
+| D-012 | Execution order follows the SRD, not Jira keys | Approved |
+| D-013 | `DEV-907` ran on the distributed profile | Recorded |
+| D-014 | Prometheus and `warp` pinned by tag + digest | Recorded |
+| D-015 | Cluster metrics endpoints require public auth | Recorded |
+| D-016 | Erasure coding amplifies the dataset 2x on disk | Recorded |
+| D-017 | Commit prefix uses the Jira key, not the subtask number | Recorded |
+| D-018 | D-010 marked Resolved before the tooling existed | Recorded |
+
 ---
 
 ## D-001 — No public repository *(RESOLVED 2026-10-01)*
@@ -271,7 +294,7 @@ lab is still in use.
 | Field | Value |
 |---|---|
 | Affects | ST04, TC-ST04-11 |
-| Status | Resolved |
+| Status | Recorded — **tooling not yet built, see D-018** |
 | Recorded | 2026-09-30 |
 
 **Reason, as originally recorded.** `fio` was not installed, `nfs-kernel-server`
@@ -280,18 +303,18 @@ authentication unavailable in a non-interactive session. Installing packages on
 the host was also undesirable, since the host is shared with other projects and
 mutating it would make the evaluation harder to reproduce.
 
-**What changed.** This was an environmental blocker, not a requirement problem.
-Both tools run in purpose-built containers with the same isolation as the rest of
-the lab: `fio` in its own image against the storage under test, and NFS served by
-a container exporting the dataset directory. Nothing is installed on the host, and
-no existing container on this host is modified.
+**What was intended.** This was an environmental blocker, not a requirement
+problem. The intent was to run both tools in purpose-built containers with the
+same isolation as the rest of the lab: `fio` in its own image against the storage
+under test, and NFS served by a container exporting the dataset directory. Nothing
+would be installed on the host, and no existing container on this host modified.
 
-**Effect.** TC-ST04-11 and the NFS cases are **no longer BLOCKED** and will be run
-in their containerised form. The Identical-Test Rule is still honoured: the same
-image and the same command are used against MinIO and against Silo, so only the
-storage backend varies. This entry supersedes the earlier "blocked" status; any
-remaining blocker would have to be re-recorded with new evidence rather than
-inherited from this one.
+**Effect, as of 2026-10-01.** The containerised tooling **does not exist yet**:
+there is no `fio` or NFS Compose service, no wrapper script, and no evidence file
+for either, in this repository as it stands. The decision to containerise is
+recorded and remains sound, but the claim that these cases are no longer blocked
+is withdrawn until the containers exist. See D-018. TC-ST04-11 and the NFS cases
+are therefore **not yet executable**, which is a different thing from failed.
 
 ## D-011 — Go runtime differs between the two servers
 
@@ -443,3 +466,83 @@ state are both recorded in `docs/01-repository-and-lab/evidence/TC-ST01-06-minio
 `TC-ST01-07-minio.txt` and `TC-ST01-08-minio.txt`. This is a lab-side observation,
 not a product finding: it must not be reported as "MinIO and Silo differ on
 metrics auth", because both were changed identically and no comparison was made.
+
+---
+
+## D-016 — Erasure coding amplifies the dataset 2x on disk
+
+| Field | Value |
+|---|---|
+| Status | Recorded |
+| Recorded | 2026-10-01 |
+| Affects | SRD 6 (storage requirements), ST02, ST08 |
+
+**Reason.** SRD 5 (Profile B) sizes the dataset at 5–10 GB and assumes that figure
+is what the lab must hold for two products. That is the logical object size, not
+the on-disk size. Each cluster is four nodes with one drive each, so MinIO selects
+a default parity of two and distributes every object across the set as two data
+plus two parity shards.
+
+**Measured.** `mc du` reports `5.3GiB` and `2409 objects` for the seeded bucket,
+while `du` on `lab/data/minio` reports `11G` — a ratio of `2.01x` on the one
+bucket measured. The same amplification applies to the Silo turn. It was not
+predicted in advance and no authoritative confirmation of the parity setting has
+been recorded yet; the ratio is a measurement, and the parity inference from it is
+not yet evidence.
+
+**Effect.** The capacity that actually has to exist per product is roughly double
+the SRD figure: a 5.26 GiB dataset occupies about 11 GB in MinIO and would occupy
+a comparable amount in Silo, plus the local copy of the same data. On the 48 GB
+host this is what exhausts the volume, and it is why only one heavy stack can be
+resident at a time. Any capacity conclusion in ST08 must be stated in on-disk
+terms, with the amplification stated alongside it, or it will understate Silo's
+and MinIO's real footprint by half.
+
+---
+
+## D-017 — Commit prefix uses the Jira key, not the subtask number
+
+| Field | Value |
+|---|---|
+| Status | Recorded |
+| Recorded | 2026-10-01 |
+| Affects | SRD 12 (public repository requirements) |
+
+**Reason.** SRD 12 states that commit messages "should start with the subtask
+number", giving `ST05: add site replication steps` as the example. Every commit in
+this repository instead begins with the Jira key, for example
+`DEV-905: ST01 add the required monitoring project and correct the dataset claim`.
+
+**Reason for the departure.** Jira key-first was chosen so that every commit is
+greppable from the issue tracker, and SRD 12 separately requires the Jira key in
+issue titles. The subtask number is retained as the second token, so both remain
+present.
+
+**Effect.** Traceability is preserved in substance; the literal prefix format does
+not match the SRD example. Nothing in the evaluation depends on it. Recorded rather
+than corrected, because the current form is the more useful one and changing six
+commits to satisfy a formatting example would rewrite published history for no
+gain. If the requester prefers strict conformance, the history can be rewritten
+before any external reader depends on it.
+
+---
+
+## D-018 — D-010 marked Resolved before the tooling existed
+
+| Field | Value |
+|---|---|
+| Status | Recorded |
+| Recorded | 2026-10-01 |
+| Affects | ST02, D-010 |
+
+**Reason.** D-010 records that `fio` and NFS were moved from the host into
+containers so that both products could be measured identically. Its status is
+`Resolved`. No such containerised tooling is present in the repository: there is
+no Compose service, no script, and no evidence file for either `fio` or NFS, and
+no NFS server is defined in either cluster.
+
+**Effect.** D-010 as written claims a capability the lab does not have. Any reader
+taking ST02's storage-testing claims at face value would conclude the
+containerised path was built and exercised. The claim is withdrawn here until the
+tooling exists; the underlying decision to containerise is still sound and the
+`fio` and NFS test cases in ST02 remain unimplemented rather than failed.

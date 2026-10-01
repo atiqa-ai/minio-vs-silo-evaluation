@@ -197,7 +197,7 @@ authoritative text, and reported as a gap.
 | O02 | Custom authorization policy behavior | Explicit | ST07 |
 | O03a | Older authentication settings | Explicit | ST07 |
 | O03b | Older notification settings | Explicit | ST07 |
-| O04 | Programs relying on old bugs | Explicit | Requires workload input; see ST11 |
+| O04 | Programs relying on old bugs | Explicit | ST07 |
 | O05 | Unknown | **No basis** | **Gap — not assessed** |
 | O06 | Multi-pool behaviour | Explicit | Out of scope: single-pool topology |
 | O07 | Replication and mixed-version | Explicit | Blocked by guardrails 11 |

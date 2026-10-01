@@ -1,0 +1,8 @@
+# Normalise line endings so the rendered docs and evidence stay stable.
+* text=auto eol=lf
+
+# Binary assets must never be line-ending converted or diffed as text.
+*.docx binary
+*.png  binary
+*.jpg  binary
+*.pdf  binary

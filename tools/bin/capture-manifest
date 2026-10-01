@@ -13,9 +13,22 @@
 #               server. TC-ST02-02 fails if any object has an empty Version ID.
 #   Checksum    the generator records both SHA-256 and MD5, but the server
 #               reports only the S3 ETag, which for these objects is the MD5.
-#               ETag is captured as-is and compared against the local MD5; a
-#               non-MD5 ETag (multipart or encrypted) would surface as a
-#               mismatch rather than being quietly accepted.
+#               ETag is captured as-is and compared against the local MD5, so a
+#               non-MD5 ETag (multipart or encrypted) surfaces as a mismatch
+#               rather than being quietly accepted.
+#
+# Division of labour, forced by what the client images actually contain:
+#
+#   in-container  the mc calls, and only bash parameter expansion. mc-client has
+#                 no sed, awk, grep, python, perl or jq (verified), so any
+#                 text processing in there would be impossible.
+#   on-host       all parsing and JSON assembly, with python3.
+#
+# `mc ls --recursive --json` is deliberately NOT used for enumeration: it emits
+# size/etag/key but no versionId, so every object would need a second call
+# anyway. Keys come from plain `mc ls --recursive` and each key then gets one
+# `mc stat --json` (key, size, etag, versionId, metadata, retention) plus one
+# `mc tag list` (tags, which stat omits).
 #
 # Usage: tools/bin/capture-manifest <minio|silo> <bucket>
 #
@@ -49,51 +62,150 @@ if [ -z "$endpoint" ]; then
 fi
 ALIAS="$PRODUCT/$BUCKET"
 
-# --recursive --json gives key, size, etag, lastModified and versionID for every
-# object in one pass. Tags and retention are NOT included by mc ls, so each
-# object is stat-ed individually for those two fields inside the container.
-# Doing it here rather than per-object from the host keeps it to one exec.
-docker exec -i "$CLIENT" bash -s -- "$PRODUCT" "$BUCKET" <<'INNER'
+# Raw capture: three tab-separated fields per object, values still JSON-encoded
+# or comma-separated exactly as mc printed them. Nothing is interpreted here.
+RAW=$(mktemp)
+trap 'rm -f "$RAW"' EXIT
+
+# Everything happens inside the container: enumeration included. A host temp file
+# cannot be handed over as a path, because /tmp inside the container is a
+# different filesystem from /tmp on the host.
+#
+# Concurrency matches seed-dataset's default. Each object costs two mc round
+# trips, so this is the same shape of load the seeding already applied.
+docker exec -i "$CLIENT" bash -s -- "$ALIAS" > "$RAW" <<'INNER'
 set -uo pipefail
-ALIAS="$1"; BUCKET="$2"
+ALIAS="$1"
+CONCURRENCY="${CAPTURE_CONCURRENCY:-4}"
 
-# The client images ship no python or jq, so JSON is parsed with sed. Both
-# commands used here emit ONE compact JSON object per line, which is what makes
-# line-oriented parsing safe:
-#
-#   mc stat --json <key>       -> 1 line (verified: wc -l == 1)
-#   mc ls --recursive --json   -> 1 object per line
-#
-# If a future mc release switches stat to pretty-printed multi-line output, the
-# seds below would silently yield empty fields instead of failing loudly. The
-# empty-field check in verify-manifest is what catches that, so it is a
-# detectable failure rather than a silent one.
-mc ls --recursive --json "$ALIAS" 2>/dev/null | while IFS= read -r line; do
-  [ -n "$line" ] || continue
-  name=$(printf '%s' "$line" | sed -n 's/.*"key":"\([^"]*\)".*/\1/p')
-  [ -n "$name" ] || continue
-  size=$(printf '%s' "$line" | sed -n 's/.*"size":\([0-9]*\).*/\1/p')
-  etag=$(printf '%s' "$line" | sed -n 's/.*"etag":"\([^"]*\)".*/\1/p')
-  vid=$(printf '%s'  "$line" | sed -n 's/.*"versionId":"\([^"]*\)".*/\1/p')
-  lm=$(printf '%s'   "$line" | sed -n 's/.*"lastModified":"\([^"]*\)".*/\1/p')
+capture_one() {
+  local key="$1" stat tags
+  # stat is one compact line on this mc build; the value is passed through
+  # verbatim so the host can parse it as JSON rather than trusting a regex.
+  stat=$(mc stat --json "$ALIAS/$key" 2>/dev/null)
+  # `mc tag list` prints a header line, then one "key : value" per tag, or the
+  # bare sentence "No tags found" when there are none. Two things must happen
+  # HERE, while the output is still newline-separated:
+  #   - drop the header and the no-tag notice, because once the lines are
+  #     comma-joined for transport the whole string's first field is "Name",
+  #     and a host-side filter would then discard every real tag;
+  #   - rewrite "key : value" as "key=value", which is the form the local
+  #     manifest uses, so the comparison is not a guaranteed mismatch.
+  # The header's padding is not fixed ("Name    :" vs "Name :"), so the field is
+  # compared after trimming rather than by exact match.
+  tags=$(mc tag list "$ALIAS/$key" 2>/dev/null | while IFS= read -r line; do
+    case "$line" in
+      *:*) ;;
+      *) continue ;;
+    esac
+    field="${line%%:*}"
+    rest="${line#*:}"
+    field="${field#"${field%%[![:space:]]*}"}"; field="${field%"${field##*[![:space:]]}"}"
+    rest="${rest#"${rest%%[![:space:]]*}"}";   rest="${rest%"${rest##*[![:space:]]}"}"
+    case "${field,,}" in
+      name) continue ;;
+    esac
+    printf '%s=%s\n' "$field" "$rest"
+  done)
+  # Newlines would break the line-oriented protocol. Both fields are single-line
+  # on this mc build, but flatten defensively rather than emit a corrupt record.
+  printf '%s\t%s\t%s\n' "$key" "${stat//$'\n'/}" "${tags//$'\n'/,}"
+}
 
-  # stat for tags (X-Amz-Tagging-Count only proves a count) and retention mode.
-  stat=$(mc stat --json "$ALIAS/$name" 2>/dev/null)
-  mode=$(printf '%s' "$stat" | sed -n 's/.*"X-Amz-Object-Lock-Mode":"\([^"]*\)".*/\1/p')
-  until=$(printf '%s' "$stat" | sed -n 's/.*"X-Amz-Object-Lock-Retain-Until-Date":"\([^"]*\)".*/\1/p')
-  tags=$(mc tag list "$ALIAS/$name" 2>/dev/null | sed -n 's/^[[:space:]]*//p' | paste -sd'&' -)
+# Enumerate here too. mc ls prefixes each line with a timestamp, so the key is
+# everything after the final space; ${line##* } does that without sed or awk,
+# which this image does not have.
+KEYS=$(mktemp)
+mc ls --recursive "$ALIAS" 2>/dev/null | while IFS= read -r line; do
+  key="${line##* }"
+  [ -n "$key" ] && printf '%s\n' "$key"
+done > "$KEYS"
 
-  # Custom metadata only: drop Content-Type and the X-Amz-Object-Lock-* headers,
-  # which are not user metadata and would otherwise show up as spurious diffs.
-  meta=$(printf '%s' "$stat" \
-    | sed -n 's/.*"X-Amz-Meta-\([A-Za-z0-9-]*\)":"\([^"]*\)".*/\1=\2/p' \
-    | paste -sd';' -)
+TOTAL=$(wc -l < "$KEYS")
+[ "$TOTAL" -gt 0 ] || { echo "ABORT: no objects found in $ALIAS" >&2; rm -f "$KEYS"; exit 1; }
+echo "== $ALIAS: $TOTAL objects to capture" >&2
 
-  # Hand-rolled JSON emission. The values are all mc-generated and contain no
-  # quotes or backslashes beyond what sed already stripped, and every field is
-  # emitted as a string so an empty value stays visible as "" rather than
-  # vanishing and being mistaken for absent.
-  printf '{"key":"%s","size":"%s","etag":"%s","versionId":"%s","lastModified":"%s","tags":"%s","metadata":"%s","retentionMode":"%s","retentionUntil":"%s"}\n' \
-    "$name" "${size:-}" "${etag:-}" "${vid:-}" "${lm:-}" "${tags:-}" "${meta:-}" "${mode:-}" "${until:-}"
-done
+while IFS= read -r key; do
+  [ -n "$key" ] || continue
+  capture_one "$key" < /dev/null &
+  while [ "$(jobs -r | wc -l)" -ge "$CONCURRENCY" ]; do wait -n || true; done
+done < "$KEYS"
+wait
+rm -f "$KEYS"
 INNER
+
+total=$(wc -l < "$RAW")
+if [ "$total" -eq 0 ]; then
+  echo "ABORT: captured 0 records from $ALIAS" >&2
+  exit 1
+fi
+echo "== captured $total records" >&2
+
+# Host-side assembly, where python3 exists.
+python3 - "$PRODUCT" "$BUCKET" "$RAW" <<'PY'
+import json, sys
+
+product, bucket, raw_path = sys.argv[1], sys.argv[2], sys.argv[3]
+out = []
+unparsed_stat = []
+
+with open(raw_path, encoding="utf-8") as fh:
+    for n, line in enumerate(fh, 1):
+        line = line.rstrip("\n")
+        if not line:
+            continue
+        parts = line.split("\t")
+        if len(parts) != 3:
+            unparsed_stat.append((parts[0] if parts else f"line{n}", "malformed record"))
+            continue
+        key, stat_raw, tags_raw = parts
+        try:
+            stat = json.loads(stat_raw)
+        except (json.JSONDecodeError, TypeError):
+            unparsed_stat.append((key, "stat not valid JSON"))
+            continue
+
+        meta = stat.get("metadata") or {}
+
+        def m(name):
+            for k, v in meta.items():
+                if k.lower() == name.lower():
+                    return v if v is not None else ""
+            return ""
+
+        row = {
+            "key": key,
+            "size": str(stat.get("size", "")),
+            "etag": (stat.get("etag") or "").strip('"'),
+            # This mc build spells the key `versionID` (capital ID), not the
+            # `versionId` used by the S3 API and by newer mc builds. Accept
+            # either spelling, or every object silently reads as having no
+            # Version ID and TC-ST02-02 fails for the wrong reason.
+            "versionId": stat.get("versionID") or stat.get("versionId") or "",
+            "lastModified": stat.get("lastModified") or "",
+            # Header already stripped in-container, so the value here is
+            # "k=v,k=v" with no newline structure left to mis-parse.
+            "tags": ",".join(t.strip() for t in tags_raw.split(",") if t.strip()),
+            # Drop the headers that are not user metadata, or every object
+            # would show a spurious diff against the local manifest.
+            "metadata": ",".join(
+                "%s=%s" % (k[len("X-Amz-Meta-"):], v)
+                for k, v in sorted(meta.items())
+                if k.lower().startswith("x-amz-meta-")
+            ),
+            "retentionMode": m("X-Amz-Object-Lock-Mode"),
+            "retentionUntil": m("X-Amz-Object-Lock-Retain-Until-Date"),
+        }
+        out.append(row)
+
+for key, why in unparsed_stat:
+    sys.stderr.write("WARN %s/%s: %s\n" % (product, bucket, why))
+
+# Deterministic order so two captures of the same bucket diff cleanly.
+out.sort(key=lambda r: r["key"])
+for row in out:
+    print(json.dumps(row, sort_keys=True))
+
+sys.stderr.write("CAPTURE_SUMMARY\tproduct=%s\tbucket=%s\tcaptured=%d\n"
+                 % (product, bucket, len(out)))
+PY

@@ -48,7 +48,7 @@ echo "   local manifest has $(wc -l < "$LOCAL") objects"
 # The comparison runs on the host, where python3 exists. The client containers
 # have no python, which is why capture emits flat single-line JSON.
 python3 - "$LOCAL" "$CAPTURED" <<'PY'
-import json, sys
+import json, re, sys
 
 local_path, server_path = sys.argv[1], sys.argv[2]
 
@@ -77,15 +77,16 @@ def norm_tags(value):
         return frozenset()
     if isinstance(value, list):
         return frozenset(value)
-    return frozenset(t for t in value.replace(";", "&").split("&") if t)
+    return frozenset(t for t in re.split(r"[;,]", value) if t)
 
 
 def norm_meta(value):
     """Metadata as a frozenset of pairs.
 
-    The local side is a dict of bare keys; the server side arrives as an
-    'X-Amz-Meta-Key=value' string, or already as a dict if a future mc emits it
-    that way. Both are normalised to (lower-cased key, value) pairs.
+    The local side is a dict of bare keys. The server side arrives as a
+    'Key=value,Key=value' string from capture-manifest. Both are normalised to
+    (lower-cased key, value) pairs so header prefix and case cannot cause a
+    spurious diff.
     """
     if not value:
         return frozenset()
@@ -93,9 +94,11 @@ def norm_meta(value):
         items = value.items()
     else:
         items = []
-        for pair in value.split(";"):
-            if "=" in pair:
-                k, v = pair.split("=", 1)
+        # capture-manifest joins with ','; the server metadata itself may also
+        # use ';'. Accept both as separators.
+        for chunk in re.split(r"[;,]", value):
+            if "=" in chunk:
+                k, v = chunk.split("=", 1)
                 items.append((k, v))
     return frozenset(
         (k[len("X-Amz-Meta-"):] if k.lower().startswith("x-amz-meta-") else k, v)
