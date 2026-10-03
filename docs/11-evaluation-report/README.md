@@ -11,7 +11,7 @@
 > the **expected result written before the test runs**, and every PASS backed by
 > raw output in `evidence/`.
 
-## Required sections (SRD section 10)
+## Required sections
 
 1. Goal
 2. Environment

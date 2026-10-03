@@ -15,7 +15,7 @@ Register summary:
 
 | ID | Subject | Status |
 |---|---|---|
-| D-001 | No public repository | Resolved 2026-10-01 |
+| D-001 |  public repository | Resolved 2026-10-01 |
 | D-002 | MinIO CE image built from source | Recorded |
 | D-003 | `mc` image built from release asset | Recorded |
 | D-004 | Host below Profile B, benchmarks indicative | Recorded |
