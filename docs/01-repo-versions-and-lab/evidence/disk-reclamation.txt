@@ -1,0 +1,210 @@
+== controlled disk reclamation ==
+captured: 2026-10-03T20:57:32Z
+
+-- BEFORE --
+df -h /
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda2        48G   45G  604M  99% /
+
+docker system df
+TYPE            TOTAL     ACTIVE    SIZE      RECLAIMABLE
+Images          14        12        4.114GB   4.063GB (98%)
+Containers      16        10        634.9kB   303.1kB (47%)
+Local Volumes   18        7         66.03MB   1.616kB (0%)
+Build Cache     17        0         1.319GB   1.094GB
+
+images (all)
+gcr.io/cadvisor/cadvisor:v0.49.1	115MB	3cde6faf0791
+grafana/grafana:11.6.16	916MB	d67af92050b8
+grafana/loki:3.2.2	137MB	030eee702c79
+grafana/promtail:3.2.2	268MB	3273ded59a0e
+mc-local:RELEASE.2025-08-13T08-35-41Z	74.4MB	80d58ab83508
+minio-ce-local:RELEASE.2025-10-15T17-29-55Z	183MB	f71deba3825f
+minio/warp:v1.3.1	44.4MB	72ae1b02216b
+nginx:1.27-alpine	74.5MB	65645c7bb6a0
+nginx/nginx-prometheus-exporter:1.3.0	17.2MB	6477cf3bddc4
+pgsty/silo:RELEASE.2026-09-16T00-00-00Z	222MB	635197cb9f36
+prom/prometheus:v2.53.1	380MB	f20d3127bf28
+prom/prometheus:v3.15.0	381MB	efd719c99d83
+registry.access.redhat.com/ubi9/ubi-micro:<none>	32.7MB	932aec77f5b8
+soul-of-lahore:latest	225MB	d09ce0f2836f
+
+build cache
+
+== TIER 1: build cache and unreferenced images ==
+authorisation: granted 2026-10-03, three-tier reclamation, ground truth
+            preserved and committed first (see dataset-manifest-provenance.txt)
+
+-- act: docker builder prune -af --
+Total reclaimed space: 0B
+
+-- act: remove unreferenced images --
+audit of references BEFORE removal:
+  prom/prometheus:v2.53.1: 1 container(s) total, 0 running
+  grafana/promtail: 0 container(s) total, 0 running
+  grafana/loki: 0 container(s) total, 0 running
+  note: prom/prometheus:v2.53.1 was referenced only by container 'prometheus',
+        already exited with code 127 (2 days prior). Not removed; only the image.
+  note: promtail and loki had no containers at all.
+  all three are public images and can be re-pulled if another project needs them.
+
+  Error response from daemon: conflict: unable to delete prom/prometheus:v2.53.1 (must be forced) - container 66b057e3defb is using its referenced image f20d3127bf28
+  Error response from daemon: No such image: grafana/promtail:latest
+  Error response from daemon: No such image: grafana/loki:latest
+
+-- AFTER TIER 1 --
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda2        48G   44G  1.7G  97% /
+
+TYPE            TOTAL     ACTIVE    SIZE      RECLAIMABLE
+Images          14        12        3.007GB   2.955GB (98%)
+Containers      16        10        634.9kB   303.1kB (47%)
+Local Volumes   18        7         66.03MB   1.616kB (0%)
+Build Cache     0         0         0B        0B
+
+-- act: remove unreferenced images (corrected tags) --
+  Untagged: registry.access.redhat.com/ubi9/ubi-micro@sha256:932aec77f5b86a5dba854a18b14a38725b296967e7dc9c7a1f4d7f0bf82e1ce5
+  Deleted: sha256:932aec77f5b86a5dba854a18b14a38725b296967e7dc9c7a1f4d7f0bf82e1ce5
+  Error response from daemon: conflict: unable to delete grafana/loki:3.2.2 (must be forced) - container e112de802a9a is using its referenced image 030eee702c79
+  Error response from daemon: conflict: unable to delete grafana/promtail:3.2.2 (must be forced) - container f5dd2b56bdda is using its referenced image 3273ded59a0e
+
+  NOT removed, deliberately:
+    prom/prometheus:v2.53.1  - referenced by exited container 'prometheus'
+                             of another project. Deleting needs --force, which
+                             would break that container's ability to restart.
+                             Left in place rather than forced.
+    minio/warp:v1.3.1        - unused by containers but REQUIRED by DEV-910/913.
+    grafana, cadvisor, soul-of-lahore, nginx-exporter - other project, running.
+
+-- AFTER TIER 1 (final) --
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda2        48G   44G  1.7G  97% /
+
+TYPE            TOTAL     ACTIVE    SIZE      RECLAIMABLE
+Images          13        12        3.007GB   2.963GB (98%)
+Containers      16        10        634.9kB   303.1kB (47%)
+Local Volumes   18        7         66.03MB   1.616kB (0%)
+Build Cache     0         0         0B        0B
+
+images remaining
+gcr.io/cadvisor/cadvisor:v0.49.1  115MB
+grafana/grafana:11.6.16  916MB
+grafana/loki:3.2.2  137MB
+grafana/promtail:3.2.2  268MB
+mc-local:RELEASE.2025-08-13T08-35-41Z  74.4MB
+minio-ce-local:RELEASE.2025-10-15T17-29-55Z  183MB
+minio/warp:v1.3.1  44.4MB
+nginx:1.27-alpine  74.5MB
+nginx/nginx-prometheus-exporter:1.3.0  17.2MB
+pgsty/silo:RELEASE.2026-09-16T00-00-00Z  222MB
+prom/prometheus:v2.53.1  380MB
+prom/prometheus:v3.15.0  381MB
+soul-of-lahore:latest  225MB
+
+== TIER 1 COMPLETION / CORRECTION ==
+  achieved: build cache 1.319 GB + dangling ubi-micro 32.7 MB
+  free space: 604 MB -> 1.7 GB
+
+  NOT COMPLETED - and the earlier justification was wrong. An earlier survey
+  queried 'docker ps -a --filter ancestor=grafana/promtail' without a tag, which
+  matched nothing, and concluded these images had no containers. With the
+  correct tag they DO have exited containers:
+    grafana/promtail:3.2.2 -> promtail (exited) 
+    grafana/loki:3.2.2 -> loki (exited) 
+    prom/prometheus:v2.53.1 -> prometheus (exited) 
+  Deleting them requires --force, which would leave those containers unable to
+  restart. They belong to another project. NOT forced. Authorisation is
+
+  re-deferred to the project owner. Blocked total: 785 MB.
+
+== TIER 2: local source dataset ==
+
+-- pre-delete integrity check: committed manifest vs on-disk --
+  on-disk:   af72bb52a3e3c211c7ff8e8b7b60fed2f8aed2396f3c0a58490bc97b33542dac
+  committed: af72bb52a3e3c211c7ff8e8b7b60fed2f8aed2396f3c0a58490bc97b33542dac
+  MATCH - ground truth is safely committed, deletion is safe
+
+-- containers mounting lab/data --
+  silo-client -> /home/devops/Documents/minio-vs-silo-evaluation/lab/data/dataset 
+  mc-client -> /home/devops/Documents/minio-vs-silo-evaluation/lab/data/dataset 
+  minio-1 -> /home/devops/Documents/minio-vs-silo-evaluation/lab/data/minio/node-1 
+  minio-2 -> /home/devops/Documents/minio-vs-silo-evaluation/lab/data/minio/node-2 
+  minio-3 -> /home/devops/Documents/minio-vs-silo-evaluation/lab/data/minio/node-3 
+  minio-4 -> /home/devops/Documents/minio-vs-silo-evaluation/lab/data/minio/node-4 
+
+-- act: stop containers bind-mounting lab/data/dataset --
+  silo-client
+
+-- act: remove local source dataset (5.3 GB) --
+   regenerable: tools/bin/gen-dataset is deterministic (fixed seed);
+   ground truth committed above; the 4-node MinIO cluster holds its own copy.
+
+-- AFTER TIER 2 --
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda2        48G   39G  7.0G  85% /
+
+  11G	lab/data/minio
+  452K	lab/data/silo
+
+  correction: mc-client ALSO bind-mounted lab/data/dataset and was still
+  running after the delete, leaving it with a removed mount. Stopped here.
+  Both clients belonged to the previous lab layout, which is not reused (R17).
+    mc-client
+
+== TIER 3: 4-node MinIO cluster data ==
+
+-- containers to stop --
+minio-1  minio-ce-local:RELEASE.2025-10-15T17-29-55Z  running
+minio-2  minio-ce-local:RELEASE.2025-10-15T17-29-55Z  running
+minio-3  minio-ce-local:RELEASE.2025-10-15T17-29-55Z  running
+minio-4  minio-ce-local:RELEASE.2025-10-15T17-29-55Z  running
+
+-- act: stop the 4-node cluster --
+  minio-1
+  minio-2
+  minio-3
+  minio-4
+
+-- per-node size before removal --
+  2.7G	lab/data/minio/node-1
+  2.7G	lab/data/minio/node-2
+  2.7G	lab/data/minio/node-3
+  2.7G	lab/data/minio/node-4
+
+
+-- act: remove cluster data (11 GB) --
+   host rm refused: files are root-owned inside the bind mount (D-009).
+   Counted, not echoed: ~16,000 permission-denied lines on xl.meta / part.1 files.
+   Completed with a container instead, per the documented cleanup method.
+   alpine:3 pulled for this one-off cleanup (sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6).
+   The lab's own images remain tag+digest pinned; this is a maintenance-only helper.
+   Result: lab/data/minio fully removed.
+
+-- AFTER TIER 3 --
+df -h /
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda2        48G   28G   18G  62% /
+
+lab/data now:
+  452K	lab/data/silo
+
+other-project containers, untouched:
+grafana  Up 2 hours
+cadvisor  Up 2 hours (healthy)
+soul-of-lahore  Up 2 hours (healthy)
+nginx-exporter  Up 2 hours
+
+== RECLAMATION SUMMARY ==
+  start                     604 MB free (99% used)
+  tier 1  build cache      +1.319 GB
+  tier 1  dangling image   +32.7 MB
+  tier 2  source dataset   +5.3 GB
+  tier 3  cluster data     +11 GB
+  end                       18 GB free (62% used)
+
+
+
+  deferred, not forced: prom/prometheus:v2.53.1 (380 MB),
+  grafana/promtail:3.2.2 (268 MB), grafana/loki:3.2.2 (137 MB) = 785 MB.
+  All three back exited containers of another project. Forcing would
+  leave those containers unable to restart.
