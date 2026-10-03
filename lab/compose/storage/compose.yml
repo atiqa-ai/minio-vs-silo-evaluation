@@ -29,14 +29,14 @@ services:
   fio:
     image: fio-local:3.41-r0
     build:
-      context: ../images/fio
+      context: ../../images/fio
     container_name: fio-runner
     # --direct=1 in the job files bypasses the page cache, which requires
     # privileges this service is granted deliberately and narrowly.
     privileged: true
     volumes:
-      - ../data/fio-target:/data
-      - ../jobs/fio:/jobs:ro
+      - ../../data/fio-target:/data
+      - ../../jobs/fio:/jobs:ro
     # No default command: fio is invoked per job with an explicit job file, so
     # that the recorded command line is the thing that produced the numbers.
     entrypoint: ["fio"]
@@ -50,13 +50,13 @@ services:
   nfs:
     image: nfs-local:2.6.4-r6
     build:
-      context: ../images/nfs
+      context: ../../images/nfs
     container_name: nfs-server
     privileged: true
     volumes:
       - /lib/modules:/lib/modules:ro
-      - ../data/nfs-export:/export
-      - ../images/nfs/exports/exports:/etc/exports:ro
+      - ../../data/nfs-export:/export
+      - ../../images/nfs/exports/exports:/etc/exports:ro
     command: ["--nfs-version", "4"]
     networks: [migration-net]
 
