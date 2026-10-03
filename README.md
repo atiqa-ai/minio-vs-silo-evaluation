@@ -22,9 +22,9 @@ benchmarking, the comparison and the recommendation — has not been performed.
 | Not started | 9 (DEV-907–DEV-915) |
 | Epic DoD groups fully met | **0 of 7** |
 
-The phase order is `DEV-905 → … → DEV-915`. Phases run strictly in that order and
-only one is authorised at a time. See [DEVIATIONS.md](DEVIATIONS.md) D-012 for why
-the SRD order governs rather than the numeric key order.
+The phase order is `DEV-905 → … → DEV-915`. Phases run in that order, and only
+one heavy cluster runs at a time, so no result is a simultaneous two-product
+measurement.
 
 The prior `ST01`–`ST10` work is **not** treated as automatically complete under the
 current contract. It is re-validated phase by phase, because the acceptance
@@ -50,17 +50,14 @@ Main epic: [DEV-904](https://github.com/atiqa-ai/minio-vs-silo-evaluation/issues
 
 ## Execution environment
 
-The project executes in an **Approved Controlled Reduced-Resource Execution
-Environment**: a VMware guest with 4 vCPU, ~7.7 GB RAM and a single 48 GB
-filesystem, against the Profile B reference of 8 vCPU / 32 GB recorded in
-`DEVIATIONS.md` D-004. The authoritative profile figures are held in the external
-project requirements and are not restated here.
+Results are produced on a VMware guest with 4 vCPU, ~7.7 GiB RAM and a single
+48 GB filesystem. The reference host is 8 vCPU / 32 GiB, so this host is below
+it on both CPU and memory. **Every performance result in this repository is
+therefore indicative and none of it establishes reference-host performance.**
 
-This is an **approved deviation**, not a silent downgrade, and it is not a new
-profile. Requirements are unchanged; the gap between required and actual is
-recorded per phase in the environment section, and performance results are
-labelled *indicative — controlled environment* rather than authoritative. Nothing
-in this repository may state that Profile A or Profile B was completed.
+The gap is stated up front rather than discovered later, and it is recorded per
+phase in that phase's environment section. Nothing in this repository claims the
+reference configuration was met.
 
 Every phase records: required specification, measured actual value, container
 limits, the deviation and its reason, the effect on results, and the residual risk

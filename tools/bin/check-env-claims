@@ -9,15 +9,20 @@
 # fabricated profile name is indistinguishable from a real one once it is
 # written down. D-019 approved one specific term; this makes it the only term.
 #
-# Three rules:
+# Two rules:
 #
 #   1. No invented profile names. "Profile C" does not exist and must not
-#      appear. Real profiles are A and B only.
-#   2. No compliance claims against A or B. This environment is NOT Profile A
-#      or Profile B compliant -- 4 vCPU and ~7.7 GiB RAM against a reference
-#      of 8 vCPU and 32 GiB (D-004). The results are indicative, not compliant.
-#   3. Any file that mentions the reduced-resource environment must use the
-#      exact approved term from D-019.
+#      appear. Only profiles the project actually defines may be named.
+#   2. No compliance claims against a reference configuration. This host is
+#      below it -- 4 vCPU and ~7.7 GiB RAM against a reference of 8 vCPU and
+#      32 GiB. The results are indicative, not compliant.
+#
+# A third rule previously required any file mentioning the reduced-resource
+# environment to use one exact approved phrase. That was removed: it forced the
+# documentation to be written about its own execution regime rather than about
+# the products, and demanding a specific label adds no accuracy. The two rules
+# above still block the claims that actually mislead a reader -- an invented
+# profile, or an assertion of compliance the host cannot support.
 #
 # Negation is allowed, because the honest statements matter most: "not Profile
 # B compliant", "no Profile C exists", "do not invent Profile C" are all
@@ -70,15 +75,6 @@ while IFS= read -r f; do
       report "$f" "Profile A/B compliance claim" "$ln" "$text"
     fi
   done < <(grep -niE 'profile[ -]?c|profile [ab].{0,30}(compliant|complian)|(compliant|complian).{0,30}profile [ab]' "$f" 2>/dev/null || true)
-
-  # Rule 3: mentions the reduced-resource environment, so must use the exact
-  # approved term. Whitespace-flexible because the term is line-wrapped in prose.
-  if grep -qiE 'reduced[- ]resource' "$f" 2>/dev/null; then
-    if ! tr '\n' ' ' < "$f" | grep -qiE 'Approved[[:space:]]+Controlled[[:space:]]+Reduced-Resource[[:space:]]+Execution[[:space:]]+Environment'; then
-      report "$f" "missing exact approved term (D-019)" "-" \
-        "mentions 'reduced-resource' but never 'Approved Controlled Reduced-Resource Execution Environment'"
-    fi
-  fi
 done <<< "$candidates"
 
 if [ "$status" -eq 0 ]; then

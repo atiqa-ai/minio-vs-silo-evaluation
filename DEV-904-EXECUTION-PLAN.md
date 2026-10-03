@@ -77,12 +77,13 @@ observation rather than reconstructed after it.
 **Goal.** Pin every version by tag and digest, assess the host, build a MinIO
 single-node Compose lab with TLS, add basic monitoring, and establish the test matrix.
 **Actions.** Restore and migrate documentation to the phase structure; promote
-governance documents to repository root; record the controlled environment; build
+governance documents to repository root; record the measured host against the
+reference figures; build
 `fio` and NFS environments; extract and pin `mcli`; establish the port allocation;
 reclaim disk under recorded authorisation; re-run secret scanning over the working
 tree **and Git history**.
-**Gate.** Every acceptance criterion evidenced; controlled environment documented
-against all required items; re-baselined lab reproducible from the repository alone.
+**Gate.** Every acceptance criterion evidenced; measured host recorded against every
+reference item; re-baselined lab reproducible from the repository alone.
 **Lab state.** Single-node MinIO running, monitoring scraping it.
 
 ### DEV-906 — Dataset, fixtures, manifest tooling
