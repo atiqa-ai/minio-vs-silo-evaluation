@@ -1,0 +1,87 @@
+== GitHub tracker and push, 2026-10-03 ==
+captured: 2026-10-03T22:03:17Z
+
+PUSH
+  First push was REJECTED: origin/main had three commits this branch did
+  not have. Nothing was force-pushed. The three commits were merged instead.
+    f1d2f65  Delete docs/10-capability-matrix-evaluation/screenshots directory
+    57d2cb2  Update README to clarify required sections heading
+    11831f7  Fix typo in deviation ID D-001
+  Author: atiqaaa <catiqa23@gmail.com>, 2026-10-02.
+  Result: merged in ccab29c, then pushed f1d2f65..ac5834d.
+  Final: local and origin/main both at ac5834d, 0 unpushed commits.
+
+  Two of the three merged commits changed meaning rather than fixing
+  defects, and were corrected after the merge:
+
+  11831f7 'Fix typo in deviation ID D-001'
+    Changed the register subject from 'No public repository' to ' public
+    repository'. That inverts the meaning; it is not a typo fix, and it leaves
+    a stray leading space. The deviation was always about holding the
+    repository local against an SRD requirement to publish, and it was
+    withdrawn on 2026-10-01. Register now reads 'Repository held local
+    instead of published | Resolved 2026-10-01 -- repository is now public'.
+    Verified rather than assumed: gh reports visibility PUBLIC.
+
+  57d2cb2 'Update README to clarify required sections heading'
+    Removed '(SRD section 10)' from ONE README out of nine, leaving the
+    phase set inconsistent. Applied to all nine so they read alike.
+
+  f1d2f65 delete of a screenshots/README.md placeholder
+    NOT applied. All eleven phase directories carry an evidence/ and
+    screenshots/ README, and phase 10 has not run yet and needs its
+    placeholder. Note git's rename detection matched the deletion to
+    phase 11 during the trial merge, because every screenshots/README.md is
+    byte identical; the reported conflict path is not the path the commit
+    was aimed at. Keeping the file resolves either reading.
+
+ISSUE BODIES REPAIRED (all 12)
+  Every one referenced paths that no longer exist after the D-024
+  documentation migration. 15 stale references total, all now corrected.
+
+  Mapping applied, extracted from git rename records rather than hand-built:
+    docs/01-repository-and-lab            -> docs/01-repo-versions-and-lab
+    docs/04-minio-performance-baseline   -> docs/06-minio-performance-baseline
+    docs/05-minio-distributed-mode        -> docs/04-minio-distributed-mode
+    docs/06-silo-functional-validation   -> docs/07-silo-functional-validation
+    docs/07-s3-client-compatibility       -> docs/08-compatibility-diff
+    docs/08-silo-benchmark                -> docs/09-silo-performance-comparison
+    docs/09-security-licensing-maintenance-> docs/10-security-licence-review
+    docs/10-capability-matrix-evaluation -> docs/11-evaluation-report
+  docs/02 was unchanged. Bodies also contained '...lab//evidence/' with a
+  doubled slash, corrected during the rewrite.
+
+  docs/00-subtask-tracker/README.md was deleted in 20a46b9 when the copied
+  requirement documents were stripped from the public repo. Issue bodies
+  now point at DEV-904-EXECUTION-PLAN.md instead.
+
+  Verified after the rewrite: zero stale references remain across all 12
+  issues, and every in-repo path referenced by an issue resolves on disk.
+
+  Issue 1's 'Authoritative documents' table listed four documents that
+  exist in NO location in the repository (docs/00-srd, docs/00-guardrails,
+  docs/00-evidence-guide, docs/00-test-cases). All were removed in 20a46b9.
+  The table now states that the requirement documents are input
+  specification, are not published here by policy, and where each one is
+  held locally.
+
+  The 'Jira reference' entry is recorded as NOT EXISTING. No Jira
+  reference file is present anywhere, including the local pack, because
+  no Jira instance or credentials are available. The DEV-9xx keys are
+  tracking labels only; no Jira identifiers are invented.
+
+SECRET SCANNING
+  gitleaks over full history before every push: 22 commits, 1.53 MB,
+  no leaks found. Re-run after the merge to cover the three imported
+  commits.
+
+  DEV-904-project-documentation-pack/ verified absent from origin/main:
+  0 tracked files in the working tree, 0 in the remote tree.
+
+STILL BLOCKED
+  GitHub Project board not created. The gh token lacks read:project and
+  the grant needs a browser device flow, which cannot be completed
+  unattended. Requires:
+    gh auth refresh -s read:project,project
+  Until then the residual gap recorded against D-001 stands: the twelve
+  issues exist but are not attached to a project board.

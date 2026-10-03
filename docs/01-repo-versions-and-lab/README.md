@@ -330,7 +330,10 @@ All five Compose projects required by SRD 4.4 exist and validate, including the
 publishing a single port. The repository is public at
 `https://github.com/atiqa-ai/minio-vs-silo-evaluation` on `main`, with the epic
 and all twelve subtasks mirrored as GitHub issues. The residual gap on D-001 is
-that those issues are not yet attached to a GitHub Project board.
+that those issues are not yet attached to a GitHub Project board. Creating one
+is blocked on token scope: `gh` lacks `read:project`, and the grant needs a
+browser device flow. Run `gh auth refresh -s read:project,project`, then
+`gh project create --owner atiqa-ai`. See `evidence/github-tracker.txt`.
 
 Two limits are inherited from the host and must be restated in the final
 recommendation:
