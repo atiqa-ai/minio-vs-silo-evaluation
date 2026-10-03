@@ -111,6 +111,51 @@ PROFILES = {
         ("medium", 4, (256 * 1024, 1024 * 1024), "general mixed workload"),
         ("empty", 2, (0, 0), "zero-byte object edge case"),
     ],
+    # Reduced profiles for the Approved Controlled Reduced-Resource Execution
+    # Environment (DEVIATIONS.md D-020). The Profile B 5-10 GB floor cannot
+    # coexist with the rest of the work on a single 48 GB filesystem: parity-2
+    # erasure turns a 5.26 GiB dataset into roughly 11 GB per cluster, and
+    # DEV-909 needs two clusters at once.
+    #
+    # These are ADDITIONAL keys. `full`, `profileb` and `smoke` are never
+    # resized in place, because every digest already recorded against them
+    # would stop reproducing.
+    #
+    # Only the `large` count is reduced. Object size stays 128 MiB, and every
+    # other category is unchanged, so key shapes, retention modes, tags and
+    # LIST depth are identical to `profileb`. The declared cost is fewer
+    # large objects, which reduces multi-object erasure coverage and the
+    # large-object sample size.
+    "reduced2g": [
+        ("small", 2000, (4 * 1024, 64 * 1024), "small-object throughput and LIST depth"),
+        ("medium", 200, (1024 * 1024, 1024 * 1024), "general mixed workload"),
+        ("large", 14, (128 * 1024 * 1024, 128 * 1024 * 1024), "large-object throughput"),
+        ("nested/a/b/c/d", 100, (8 * 1024, 64 * 1024), "nested prefix and LIST behaviour"),
+        ("empty", 4, (0, 0), "zero-byte object edge case"),
+        ("unicode/ünïcödé/δοκιμή", 40, (1 * 1024, 16 * 1024), "non-ASCII key handling"),
+        ("special/chars with spaces+plus", 25, (1 * 1024, 8 * 1024), "key characters needing quoting"),
+    ],
+    # Sized for DEV-909, where source and target MinIO deployments are resident
+    # at the same time. See `reduced2g` for why only `large` varies.
+    "reduced1g": [
+        ("small", 2000, (4 * 1024, 64 * 1024), "small-object throughput and LIST depth"),
+        ("medium", 200, (1024 * 1024, 1024 * 1024), "general mixed workload"),
+        ("large", 6, (128 * 1024 * 1024, 128 * 1024 * 1024), "large-object throughput"),
+        ("nested/a/b/c/d", 100, (8 * 1024, 64 * 1024), "nested prefix and LIST behaviour"),
+        ("empty", 4, (0, 0), "zero-byte object edge case"),
+        ("unicode/ünïcödé/δοκιμή", 40, (1 * 1024, 16 * 1024), "non-ASCII key handling"),
+        ("special/chars with spaces+plus", 25, (1 * 1024, 8 * 1024), "key characters needing quoting"),
+    ],
+}
+
+# Declared floor per reduced profile. Used as the default for --min-bytes so
+# the tool's own guard still enforces the profile's intended size, while
+# `meets_profile_b_floor` continues to be measured against the Profile B floor
+# and recorded as False. That combination is the required-vs-actual record:
+# the reduced profile is internally consistent, and it is visibly not Profile B.
+PROFILE_FLOORS = {
+    "reduced2g": 2 * 1024 ** 3,
+    "reduced1g": 1 * 1024 ** 3,
 }
 
 # SRD profile B dataset floor. Enforced by --min-bytes so that "the dataset was
@@ -285,10 +330,12 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", required=True, help="output directory")
     ap.add_argument("--profile", default="profileb", choices=sorted(PROFILES))
-    ap.add_argument("--min-bytes", type=int, default=PROFILE_B_MIN_BYTES,
-                    help="fail if the realised dataset is smaller than this "
-                         f"(default {PROFILE_B_MIN_BYTES} = the Profile B 5 GiB floor; "
-                         "pass 0 to disable)")
+    ap.add_argument("--min-bytes", type=int, default=None,
+                    help="fail if the realised dataset is smaller than this. "
+                         "Defaults to the profile's declared floor: "
+                         f"{PROFILE_B_MIN_BYTES} (the Profile B 5 GiB floor) for "
+                         "full/profileb/smoke, or the reduced profile's own floor. "
+                         "Pass 0 to disable.")
     ap.add_argument("--verify-deterministic", action="store_true",
                     help="regenerate and compare digests instead of writing data")
     ap.add_argument("--quiet", action="store_true")
@@ -298,6 +345,9 @@ def main():
         sys.exit(verify_deterministic(args.out, args.profile, args.quiet))
 
     summary = generate(args.out, args.profile, args.quiet)
+
+    if args.min_bytes is None:
+        args.min_bytes = PROFILE_FLOORS.get(args.profile, PROFILE_B_MIN_BYTES)
 
     if args.min_bytes and summary["total_bytes"] < args.min_bytes:
         print(

@@ -1,0 +1,54 @@
+== reduced dataset profiles (DEVIATIONS.md D-020) ==
+captured: 2026-10-03T21:08:32Z
+
+-- reduced2g --profile reduced2g --out <dir> --
+{
+  "manifest": "/tmp/ds-test/dataset-manifest.jsonl",
+  "meets_profile_b_floor": false,
+  "object_count": 2383,
+  "profile": "reduced2g",
+  "profile_b_floor_bytes": 5368709120,
+  "seed": "minio-vs-silo-evaluation/ST02",
+  "total_bytes": 2162187895,
+  "total_gib": 2.014
+}
+exit=0
+
+-- reduced2g --verify-deterministic --
+{ "checked": 2383, "deterministic": true, "mismatches": 0 }
+
+-- reduced1g --profile reduced1g --out <dir> --
+{
+  "manifest": "/tmp/ds1g/dataset-manifest.jsonl",
+  "meets_profile_b_floor": false,
+  "object_count": 2375,
+  "profile": "reduced1g",
+  "profile_b_floor_bytes": 5368709120,
+  "seed": "minio-vs-silo-evaluation/ST02",
+  "total_bytes": 1088446071,
+  "total_gib": 1.014
+}
+exit=0
+
+-- regression: existing profiles untouched --
+  full      669 objs     928844494 B  0.865 GiB
+  profileb 2409 objs   5651848823 B  5.264 GiB   <- identical to recorded evidence
+  smoke      16 objs       3017183 B  0.003 GiB
+  profileb recomputation equals the previously recorded 2409 objs / 5651848823 B: True
+
+-- guard still rejects an undersized dataset --
+  gen-dataset --profile smoke --min-bytes 5368709120
+  -> FATAL: dataset is 3017183 bytes (0.00 GiB), below the required
+     5368709120 bytes (5.00 GiB) floor.
+  exit=2
+
+-- interpretation --
+  reduced2g/reduced1g each satisfy their OWN declared floor, so the tool's
+  guard passes, while meets_profile_b_floor is false against the Profile B
+  floor and profile_b_floor_bytes still records 5368709120. The required-vs-
+  actual gap is therefore recorded by the tool on every run.
+
+  Only the 'large' count differs from profileb (40 -> 14 -> 6). Object size
+  stays 128 MiB and all other categories are unchanged. Declared cost:
+  fewer large objects, so less multi-object erasure coverage and a smaller
+  large-object sample. See D-020.
