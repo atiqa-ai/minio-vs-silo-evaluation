@@ -15,7 +15,7 @@ SRC="$TOOLS/src/minio"
 GOPATH="$TOOLS/gopath"
 GOROOT="$TOOLS/go"
 CTX="$REPO_ROOT/lab/images/minio"
-OUTDIR="$REPO_ROOT/docs/01-repository-and-lab/evidence"
+OUTDIR="$REPO_ROOT/docs/01-repo-versions-and-lab/evidence"
 
 # The last open-source MinIO Community Edition release. Immutable.
 TAG="RELEASE.2025-10-15T17-29-55Z"
@@ -31,7 +31,7 @@ mkdir -p "$OUTDIR"
 
 # ---------------------------------------------------------------- toolchain
 if [ ! -x "$GOROOT/bin/go" ]; then
-  die "Go toolchain missing at $GOROOT. See docs/01-repository-and-lab/README.md step 1."
+  die "Go toolchain missing at $GOROOT. See docs/01-repo-versions-and-lab/README.md step 1."
 fi
 export PATH="$GOROOT/bin:$PATH" GOPATH GOPROXY=https://proxy.golang.org,direct
 

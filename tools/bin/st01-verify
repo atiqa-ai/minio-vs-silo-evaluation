@@ -2,7 +2,7 @@
 # ST01 - Repository and Lab verification.
 #
 # Runs TC-ST01-01 .. TC-ST01-08 and writes the raw command output for each one to
-# docs/01-repository-and-lab/evidence/. Nothing is interpreted here: this script
+# docs/01-repo-versions-and-lab/evidence/. Nothing is interpreted here: this script
 # only records what the commands printed. Pass/fail judgement belongs in the
 # ST01 README, next to the evidence it cites.
 #
@@ -22,7 +22,7 @@ case "$SUFFIX" in
   silo)  NODES="silo-1 silo-2 silo-3 silo-4";   PROJECT=silo-cluster ;;
   *)     die "usage: st01-verify [minio|silo]" ;;
 esac
-EV="$ROOT/docs/01-repository-and-lab/evidence"
+EV="$ROOT/docs/01-repo-versions-and-lab/evidence"
 ENV_FILE="$ROOT/lab/compose/.env"
 
 mkdir -p "$EV"
@@ -64,7 +64,7 @@ run TC-ST01-02 "Verify Docker Compose v2" \
 
 # ---------------------------------------------------------------- TC-ST01-03
 run TC-ST01-03 "Verify pinned MinIO image and digest" \
-  'docker image inspect minio-ce-local:RELEASE.2025-10-15T17-29-55Z --format "Id: {{.Id}}"; docker images --digests minio-ce-local; echo; echo "--- declared in compose ---"; grep -n "MINIO_IMAGE" '"$ROOT"'/lab/compose/.env; echo; echo "--- build provenance ---"; cat '"$ROOT"'/docs/01-repository-and-lab/evidence/minio-build-provenance.txt; echo; echo "--- binary self-reported version ---"; docker exec minio-1 minio --version 2>&1 || docker run --rm minio-ce-local:RELEASE.2025-10-15T17-29-55Z minio --version 2>&1'
+  'docker image inspect minio-ce-local:RELEASE.2025-10-15T17-29-55Z --format "Id: {{.Id}}"; docker images --digests minio-ce-local; echo; echo "--- declared in compose ---"; grep -n "MINIO_IMAGE" '"$ROOT"'/lab/compose/.env; echo; echo "--- build provenance ---"; cat '"$ROOT"'/docs/01-repo-versions-and-lab/evidence/minio-build-provenance.txt; echo; echo "--- binary self-reported version ---"; docker exec minio-1 minio --version 2>&1 || docker run --rm minio-ce-local:RELEASE.2025-10-15T17-29-55Z minio --version 2>&1'
 
 # ---------------------------------------------------------------- TC-ST01-04
 run TC-ST01-04 "Verify pinned Silo image and digest" \
@@ -92,5 +92,5 @@ run TC-ST01-08 "Verify published ports bind to 127.0.0.1" \
   'echo "--- lab bind addresses, from container inspect (authoritative) ---"; ports=0; for c in minio-1 silo-1 lb-minio lb-silo lab-prometheus; do docker inspect "$c" >/dev/null 2>&1 || continue; printf "[%s]\n" "$c"; docker inspect -f "{{json .NetworkSettings.Ports}}" "$c"; done; echo; echo "--- assert every lab published port binds to 127.0.0.1 ---"; bad=0; seen=0; for c in minio-1 silo-1 lb-minio lb-silo lab-prometheus; do docker inspect "$c" >/dev/null 2>&1 || continue; n=$(docker inspect -f "{{range \$p,\$b := .NetworkSettings.Ports}}{{range \$b}}{{.HostPort}}{{end}}{{end}}" "$c"); [ -z "$n" ] && echo "  $c -> no host port bindings (must publish nothing: SRD 4.4)"; docker inspect -f "{{range \$p,\$b := .NetworkSettings.Ports}}{{range \$b}}{{.HostIp}} {{.HostPort}}{{\"\n\"}}{{end}}{{end}}" "$c" | while read -r ip port; do [ -z "${port:-}" ] && continue; echo "  $c -> $ip:$port"; done; done; echo; echo "--- listening sockets for lab ports only ---"; for p in '"$ROOT"'/ports; do :; done; P=$(grep -E "^(MINIO_CONSOLE_PORT|SILO_CONSOLE_PORT|MINIO_PROXY_PORT|SILO_PROXY_PORT)=" '"$ROOT"'/lab/compose/.env | cut -d= -f2 | paste -sd"|"); echo "  lab ports from .env: $P"; (ss -ltn 2>/dev/null || netstat -ltn) | grep -E ":($P)[[:space:]]" | sed "s/^/  /"; echo; echo "--- assert none of the lab ports is wildcard-bound ---"; if (ss -ltn 2>/dev/null || netstat -ltn) | grep -E "0\.0\.0\.0:($P)[[:space:]]|\*:($P)[[:space:]]"; then echo "  FAIL: a lab port is wildcard-bound"; else echo "  OK: every lab port is bound to a loopback address only"; fi; echo; echo "--- unrelated pre-existing containers (recorded for context, NOT this project) ---"; for c in grafana cadvisor nginx-exporter; do printf "  %-16s " "$c"; docker port "$c" 2>/dev/null | tr "\n" " "; echo; done; echo; echo "--- BIND_ADDR in .env ---"; grep -n "BIND_ADDR" '"$ROOT"'/lab/compose/.env'
 
 echo
-echo "ST01 verification complete. Evidence written to docs/01-repository-and-lab/evidence/"
+echo "ST01 verification complete. Evidence written to docs/01-repo-versions-and-lab/evidence/"
 ls -1 "$EV"

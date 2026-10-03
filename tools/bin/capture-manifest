@@ -112,12 +112,41 @@ capture_one() {
   printf '%s\t%s\t%s\n' "$key" "${stat//$'\n'/}" "${tags//$'\n'/,}"
 }
 
-# Enumerate here too. mc ls prefixes each line with a timestamp, so the key is
-# everything after the final space; ${line##* } does that without sed or awk,
-# which this image does not have.
+# Enumerate here too. `mc ls --recursive` prints
+# "[<timestamp>]<spaces><size> <type> <key>", e.g.
+#   [2026-10-01 22:42:53 UTC]     0B STANDARD empty/00000.bin
+#   [2026-10-01 22:44:59 UTC] 3.9KiB STANDARD special/chars with spaces+plus/00000.bin
+#
+# Two traps, both of which were hit and fixed rather than reasoned about in
+# advance:
+#
+#   * ${line##* } (everything after the LAST space) is wrong, and silently
+#     corrupts data. Any key containing a space loses its prefix, so the 25
+#     objects under "special/chars with spaces+plus/" were enumerated as
+#     "spaces+plus/..." and reported as 25 missing plus 25 extra while the
+#     objects themselves were intact.
+#   * The size field is RIGHT-ALIGNED in its column, so several spaces separate
+#     "]" from the size. Stripping only one of them leaves leading blanks, and a
+#     later single-token strip then removes the size instead of the type,
+#     leaving "0B STANDARD empty/00000.bin" as the key.
+#
+# So: cut at the first "]", drop leading blanks, then drop the size token and
+# the type token as separate fields. Key-internal spaces are never touched.
+# No backslash escapes are used, because an escaped "]" inside a case pattern or
+# a ${var#...} pattern is easy for a shell layer to mangle, and a guard that
+# quietly stops matching would drop every key and yield an empty capture.
 KEYS=$(mktemp)
 mc ls --recursive "$ALIAS" 2>/dev/null | while IFS= read -r line; do
-  key="${line##* }"
+  case "$line" in
+    "["*"] "*) ;;
+    *) continue ;;
+  esac
+  key="${line#*]}"
+  key="${key#"${key%%[![:space:]]*}"}"
+  key="${key#* }"
+  case "$key" in
+    "STANDARD "*|"file "*|"directory "*) key="${key#* }" ;;
+  esac
   [ -n "$key" ] && printf '%s\n' "$key"
 done > "$KEYS"
 

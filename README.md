@@ -11,74 +11,96 @@ establish, with reproducible evidence, whether that substitution is safe.
 
 ## Current state
 
-**This project is not complete.** One of ten subtasks is finished and one is in
-progress. None of the seven Epic-level Definition of Done groups is fully met.
+**This project is not complete.** No phase is signed off. The laboratory and the
+measurement tooling exist; the evaluation itself — feature validation, performance
+benchmarking, the comparison and the recommendation — has not been performed.
 
 | | |
 |---|---|
-| Subtasks complete | **1 of 10** (ST01) |
-| In progress | 1 (ST02) |
-| Not started | 8 (ST03–ST10) |
+| Phases complete | **0 of 11** |
+| Partially evidenced, defects open | 2 (DEV-905, DEV-906) |
+| Not started | 9 (DEV-907–DEV-915) |
 | Epic DoD groups fully met | **0 of 7** |
-| SRD final outputs ready | **1 of 10** |
 
-What exists today is the laboratory and the measurement tooling: two
-four-node Docker Compose clusters, a monitoring stack, and a deterministic test
-dataset with a manifest verification toolkit. The evaluation itself — feature
-validation, performance benchmarking, the comparison and the recommendation —
-has not been performed.
+The phase order is `DEV-905 → … → DEV-915`. Phases run strictly in that order and
+only one is authorised at a time. See [DEVIATIONS.md](DEVIATIONS.md) D-012 for why
+the SRD order governs rather than the numeric key order.
 
-Reported honestly: eight of the ten subtask reports in `docs/` are structural
-placeholders. They have the required headings and no findings behind them, because
-their subtasks have not run.
+The prior `ST01`–`ST10` work is **not** treated as automatically complete under the
+current contract. It is re-validated phase by phase, because the acceptance
+criteria, the documentation structure and the execution environment have all changed.
 
-## Subtask status
+## Phase status
 
-| ID | Jira | Subtask | Status | Report |
+| ID | Phase | Scope | Status | Report |
 |---|---|---|---|---|
-| ST01 | DEV-905 | Repository, pinned versions, local Compose lab | **Complete** | [docs/01](docs/01-repository-and-lab/README.md) |
-| ST02 | DEV-906 | Test data and verification toolkit | **In Progress** | [docs/02](docs/02-test-data-and-verification/README.md) |
-| ST03 | DEV-907 | MinIO feature validation | Not Started | [docs/03](docs/03-minio-feature-validation/README.md) |
-| ST04 | DEV-910 | MinIO performance baseline | Not Started | [docs/04](docs/04-minio-performance-baseline/README.md) |
-| ST05 | DEV-908/909 | MinIO distributed mode: resilience, healing, replication | Not Started | [docs/05](docs/05-minio-distributed-mode/README.md) |
-| ST06 | DEV-911 | Silo functional validation | Not Started | [docs/06](docs/06-silo-functional-validation/README.md) |
-| ST07 | DEV-912 | S3 and client compatibility differences | Not Started | [docs/07](docs/07-s3-client-compatibility/README.md) |
-| ST08 | DEV-913 | Silo benchmark against the MinIO baseline | Not Started | [docs/08](docs/08-silo-benchmark/README.md) |
-| ST09 | DEV-914 | Security, licensing, maintenance, CVE review | Not Started | [docs/09](docs/09-security-licensing-maintenance/README.md) |
-| ST10 | DEV-915 | Capability matrix, evaluation and recommendation | Not Started | [docs/10](docs/10-capability-matrix-evaluation/README.md) |
+| DEV-905 | Repository, pinned versions, single-node lab, TLS, monitoring | Repository, version pinning, local machine assessment, MinIO single-node lab, TLS, basic monitoring, test matrix | Re-validation in progress | [docs/01](docs/01-repo-versions-and-lab/README.md) |
+| DEV-906 | Test data and verification | Synthetic dataset, versioning/object-lock/lifecycle/IAM fixtures, manifest generation and comparison tooling | Partial — open defects | [docs/02](docs/02-test-data-and-verification/README.md) |
+| DEV-907 | MinIO feature validation | MinIO single-node feature validation | Not started | [docs/03](docs/03-minio-feature-validation/README.md) |
+| DEV-908 | MinIO distributed mode | Distributed mode, resilience, healing, expansion | Not started | [docs/04](docs/04-minio-distributed-mode/README.md) |
+| DEV-909 | MinIO replication | Bucket/batch/site replication and runbook | Not started | [docs/05](docs/05-minio-replication/README.md) |
+| DEV-910 | MinIO performance baseline | `warp` profiles and storage-layer `fio` measurements | Not started | [docs/06](docs/06-minio-performance-baseline/README.md) |
+| DEV-911 | Silo functional validation | Silo functional validation in a comparable environment | Not started | [docs/07](docs/07-silo-functional-validation/README.md) |
+| DEV-912 | Compatibility edge cases | Compatibility differences and O01–O08 | Not started | [docs/08](docs/08-compatibility-diff/README.md) |
+| DEV-913 | Silo performance comparison | Identical benchmark methodology, side-by-side deltas | Not started | [docs/09](docs/09-silo-performance-comparison/README.md) |
+| DEV-914 | Security and licensing | CVE review, provenance, licence review, maintenance risk, exit strategy | Not started | [docs/10](docs/10-security-licence-review/README.md) |
+| DEV-915 | Evaluation and recommendation | Capability matrix, executive report, risks, final recommendation | Not started | [docs/11](docs/11-evaluation-report/README.md) |
 
 Main epic: [DEV-904](https://github.com/atiqa-ai/minio-vs-silo-evaluation/issues/1).
-The ST sequence is the execution order; the Jira keys are a tracking map, so
-`DEV-907` runs before `DEV-908` (see `DEVIATIONS.md` D-012).
+
+## Execution environment
+
+The project executes in an **Approved Controlled Reduced-Resource Execution
+Environment**: a VMware guest with 4 vCPU, ~7.7 GB RAM and a single 48 GB
+filesystem, against the Profile B reference of 8 vCPU / 32 GB recorded in
+`DEVIATIONS.md` D-004. The authoritative profile figures are held in the external
+project requirements and are not restated here.
+
+This is an **approved deviation**, not a silent downgrade, and it is not a new
+profile. Requirements are unchanged; the gap between required and actual is
+recorded per phase in the environment section, and performance results are
+labelled *indicative — controlled environment* rather than authoritative. Nothing
+in this repository may state that Profile A or Profile B was completed.
+
+Every phase records: required specification, measured actual value, container
+limits, the deviation and its reason, the effect on results, and the residual risk
+to the conclusion. Two consequences are recorded up front rather than discovered
+later:
+
+- Performance numbers cannot support capacity or production-sizing conclusions.
+- The dataset is smaller than the Profile B 5–10 GB floor, so the Profile B
+  dataset requirement is **not met**. The measured value is always reported.
 
 ## Where to start
 
 | If you want to… | Read |
 |---|---|
 | Know what has been done and what has not | This file, then [DEVIATIONS.md](DEVIATIONS.md) |
-| Review the lab and the evidence so far | [docs/01](docs/01-repository-and-lab/README.md) |
+| See the full phase-by-phase plan and gates | [DEV-904-EXECUTION-PLAN.md](DEV-904-EXECUTION-PLAN.md) |
+| Review the lab and the evidence so far | [docs/01](docs/01-repo-versions-and-lab/README.md) |
 | Review the test data and verification | [docs/02](docs/02-test-data-and-verification/README.md) |
-| Rebuild the lab from scratch | [docs/01](docs/01-repository-and-lab/README.md) §12 |
+| Rebuild the lab from scratch | [docs/01](docs/01-repo-versions-and-lab/README.md) §12 |
 | See every departure from the requirements | [DEVIATIONS.md](DEVIATIONS.md) |
-| Read a structured status report | Generate it with `tools/bin/build-docx.py` |
 
 ## Repository layout
 
 ```text
 .
-├── README.md                 # This file: status and navigation
-├── DEVIATIONS.md             # Every departure from the requirements, with reasons
+├── README.md                     # This file: status and navigation
+├── DEVIATIONS.md                 # Every departure from the requirements, with reasons
+├── DEV-904-EXECUTION-PLAN.md     # Phase plan, gates, dependencies, risk register
 ├── docs/
-│   ├── 01-repository-and-lab/            # ST01
-│   ├── 02-test-data-and-verification/    # ST02
-│   ├── 03-minio-feature-validation/      # ST03
-│   ├── 04-minio-performance-baseline/    # ST04
-│   ├── 05-minio-distributed-mode/        # ST05
-│   ├── 06-silo-functional-validation/    # ST06
-│   ├── 07-s3-client-compatibility/       # ST07
-│   ├── 08-silo-benchmark/                # ST08
-│   ├── 09-security-licensing-maintenance/ # ST09
-│   └── 10-capability-matrix-evaluation/  # ST10
+│   ├── 01-repo-versions-and-lab/           # DEV-905
+│   ├── 02-test-data-and-verification/      # DEV-906
+│   ├── 03-minio-feature-validation/        # DEV-907
+│   ├── 04-minio-distributed-mode/          # DEV-908
+│   ├── 05-minio-replication/               # DEV-909
+│   ├── 06-minio-performance-baseline/      # DEV-910
+│   ├── 07-silo-functional-validation/      # DEV-911
+│   ├── 08-compatibility-diff/              # DEV-912
+│   ├── 09-silo-performance-comparison/     # DEV-913
+│   ├── 10-security-licence-review/         # DEV-914
+│   └── 11-evaluation-report/               # DEV-915
 ├── lab/
 │   ├── compose/               # minio, silo, proxy, workload, monitoring
 │   └── data/                  # cluster data and generated dataset (not committed)
@@ -97,10 +119,13 @@ The comparison is only meaningful if the two products are measured identically, 
 the lab enforces that structurally:
 
 - **MinIO first, then Silo.** The same dataset, the same client binary, the same
-  scripts, the same commands. Only the storage backend varies between runs.
-- **One product at a time.** Clusters are never co-resident on a shared disk, and
-  MinIO and Silo nodes are never placed in the same cluster. Enforced by a
-  pre-commit hook.
+  scripts, the same commands. Only the storage backend varies between runs. In
+  particular the *same* client drives both products, so a difference cannot be
+  attributed to the client.
+- **No mixed clusters.** MinIO and Silo nodes are never placed in the same
+  cluster. Enforced by a pre-commit hook. Co-resident MinIO-only deployments are
+  permitted where a phase genuinely needs them, such as replication, and are
+  recorded as such.
 - **Synthetic data only.** No real, company, or personal data is used anywhere.
 - **Immutable image tags.** Every image is pinned by tag *and* registry digest,
   including `monitoring` and `warp`.
@@ -110,26 +135,38 @@ the lab enforces that structurally:
 - **Failures stay failures.** A finding that cannot be reproduced is reported as
   such, including findings about the lab itself.
 
-## Scope limits worth knowing before reviewing
+## Known limitations worth knowing before reviewing
 
-- **Hardware is below the reference profile.** The host has 4 vCPU and ~7.7 GB
-  RAM against a recommended 8 vCPU / 16 GB. Every performance number this project
-  produces is therefore *indicative*, not authoritative (D-004).
+- **The host is below the reference profile**, and execution is in an approved
+  controlled reduced-resource environment. Performance results are *indicative* and
+  cannot support capacity conclusions (D-004, D-019).
 - **Erasure coding doubles the disk footprint.** Four nodes with one drive each
-  means a parity of two, so a 5.3 GiB dataset occupies roughly 11 GB on the
+  means a parity of two, so a 5.26 GiB dataset occupies roughly 11 GB on the
   volume. Capacity conclusions must be read in on-disk terms (D-016).
-- **Some capability claims are not yet buildable.** The containerised `fio` and
-  NFS tooling referenced by the requirements does not exist yet, so those cases
-  are not yet executable — which is different from failed (D-010, D-018).
-- **Two objectives cannot be assessed at all.** O05 and O08 have no basis in the
-  supplied requirements, so no evidence could exist for them (D-006).
+- **The dataset is below the Profile B floor.** Reduced dataset profiles are used
+  so the phases are executable at all; the Profile B 5–10 GB requirement is recorded
+  as not met, with the measured value (D-020).
+- **The configured `warp` profile does not fit the disk.** The original parameters
+  require more space than the host has, so benchmark parameters are reduced and the
+  reduction is recorded (D-021).
+- **Storage-layer tooling is being built, not assumed.** The containerised `fio`
+  and NFS environments referenced by the requirements do not exist yet, so those
+  cases are *not yet executable*, which is different from failed (D-010, D-018).
+- **O01–O08 now have an authoritative source.** Earlier revisions recorded O05 and
+  O08 as having no basis in the supplied requirements. The vendor publishes all
+  eight compatibility conditions; they are captured as a documented vendor claim and
+  then independently tested against both products (D-022).
 
 ## Repository security
 
 This is a **public** repository and contains no credentials, internal hostnames,
 domains, or addresses. `.env` files are excluded and only `.env.example`, holding
 placeholders, is committed. `gitleaks` runs on every commit via a pre-commit hook,
-and a further hook rejects MinIO and Silo being mixed in one cluster.
+and further hooks reject MinIO and Silo being mixed in one cluster and reject
+environment claims the measurements do not support.
+
+`DEV-904-project-documentation-pack/` is agent instruction material, not project
+content, and is deliberately excluded from version control.
 
 ## Licence and attribution
 

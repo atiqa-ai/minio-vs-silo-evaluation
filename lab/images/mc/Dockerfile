@@ -10,7 +10,7 @@
 # The staged ./mc binary is the official asset and its sha256 was verified
 # against the upstream .sha256sum file before staging:
 #   01f866e9c5f9b87c2b09116fa5d7c06695b106242d829a8bb32990c00312e891
-# Verification evidence: docs/01-repository-and-lab/evidence/
+# Verification evidence: docs/01-repo-versions-and-lab/evidence/
 #
 # Base matches the MinIO baseline image so the client is not a hidden variable
 # between the MinIO and Silo test runs (Identical-Test Rule, guardrails 6).

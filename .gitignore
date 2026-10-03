@@ -2,7 +2,7 @@
 # Toolchains, sources and downloaded artefacts
 # ---------------------------------------------------------------------------
 # Reproduced by tools/bin/build-minio.sh, not committed. See
-# docs/01-repository-and-lab/evidence/minio-build-provenance.txt.
+# docs/01-repo-versions-and-lab/evidence/minio-build-provenance.txt.
 tools/go/
 tools/gopath/
 tools/src/
@@ -37,7 +37,7 @@ lab/compose/.env
 # ---------------------------------------------------------------------------
 # MinIO and Silo write as root inside these bind mounts, so cleanup needs a
 # container (see the Cleanup section of
-# docs/01-repository-and-lab/README.md) rather than a host rm.
+# docs/01-repo-versions-and-lab/README.md) rather than a host rm.
 lab/data/
 lab/logs/
 

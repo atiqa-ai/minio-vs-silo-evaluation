@@ -20,6 +20,14 @@
 #
 # Usage: tools/bin/verify-manifest <minio|silo> <bucket> [local-manifest]
 #
+#        tools/bin/verify-manifest <minio|silo> <bucket> --captured FILE
+#
+# --captured verifies a manifest that capture-manifest already produced instead
+# of issuing a second full read of the bucket. Capture is two mc round trips per
+# object, so re-reading 2409 objects to check work that was just read costs half
+# an hour for no new information. The flag matters for reproducibility too: the
+# evidence then refers to a file that exists on disk and can be re-checked.
+#
 # Exit status: 0 all objects match, 1 at least one mismatch, 2 bad usage.
 
 set -uo pipefail
@@ -27,21 +35,36 @@ set -uo pipefail
 PRODUCT="${1:-}"
 BUCKET="${2:-}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-LOCAL="${3:-$ROOT/lab/data/dataset/dataset-manifest.jsonl}"
+LOCAL="$ROOT/lab/data/dataset/dataset-manifest.jsonl"
+PRE_CAPTURED=""
+
+# Third argument is either --captured with its file, or the local manifest path.
+if [ "${3:-}" = "--captured" ]; then
+    PRE_CAPTURED="${4:-}"
+    [ -n "$PRE_CAPTURED" ] || { echo "usage: $0 $PRODUCT $BUCKET --captured FILE" >&2; exit 2; }
+elif [ -n "${3:-}" ]; then
+    LOCAL="$3"
+fi
 
 case "$PRODUCT" in
   minio) CLIENT=mc-client ;;
   silo)  CLIENT=silo-client ;;
-  *) echo "usage: $0 <minio|silo> <bucket> [local-manifest]" >&2; exit 2 ;;
+  *) echo "usage: $0 <minio|silo> <bucket> [--captured FILE]" >&2; exit 2 ;;
 esac
 [ -n "$BUCKET" ] || { echo "usage: $0 <minio|silo> <bucket>" >&2; exit 2; }
 [ -f "$LOCAL" ] || { echo "missing local manifest: $LOCAL" >&2; exit 2; }
 
-CAPTURED=$(mktemp)
-trap 'rm -f "$CAPTURED" "$CAPTURED.n"' EXIT
+if [ -n "$PRE_CAPTURED" ]; then
+    [ -f "$PRE_CAPTURED" ] || { echo "missing captured manifest: $PRE_CAPTURED" >&2; exit 2; }
+    CAPTURED="$PRE_CAPTURED"
+    echo "== verifying against the existing capture $PRE_CAPTURED"
+else
+    CAPTURED=$(mktemp)
+    trap 'rm -f "$CAPTURED" "$CAPTURED.n"' EXIT
+    echo "== capturing server manifest for $PRODUCT/$BUCKET"
+    "$ROOT/tools/bin/capture-manifest" "$PRODUCT" "$BUCKET" > "$CAPTURED"
+fi
 
-echo "== capturing server manifest for $PRODUCT/$BUCKET"
-"$ROOT/tools/bin/capture-manifest" "$PRODUCT" "$BUCKET" > "$CAPTURED"
 echo "   captured $(wc -l < "$CAPTURED") objects from the server"
 echo "   local manifest has $(wc -l < "$LOCAL") objects"
 
@@ -101,7 +124,9 @@ def norm_meta(value):
                 k, v = chunk.split("=", 1)
                 items.append((k, v))
     return frozenset(
-        (k[len("X-Amz-Meta-"):] if k.lower().startswith("x-amz-meta-") else k, v)
+        (k[len("X-Amz-Meta-"):].strip().lower()
+         if k.strip().lower().startswith("x-amz-meta-") else k.strip().lower(),
+         v.strip())
         for k, v in items
     )
 

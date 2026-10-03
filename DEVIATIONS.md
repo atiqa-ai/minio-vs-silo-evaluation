@@ -20,7 +20,7 @@ Register summary:
 | D-003 | `mc` image built from release asset | Recorded |
 | D-004 | Host below Profile B, benchmarks indicative | Recorded |
 | D-005 | Dataset size, first pass under-sized | Resolved 2026-10-01 |
-| D-006 | O01–O08 derived from the SRD, not supplied | Recorded |
+| D-006 | O01–O08 derived from the SRD, not supplied | Amended by D-022 — vendor source found |
 | D-007 | Proxy ports moved off 8080 | Approved |
 | D-008 | Load balancers gated on cluster state | Recorded |
 | D-009 | Cluster data dirs are root-owned bind mounts | Recorded |
@@ -33,6 +33,12 @@ Register summary:
 | D-016 | Erasure coding amplifies the dataset 2x on disk | Recorded |
 | D-017 | Commit prefix uses the Jira key, not the subtask number | Recorded |
 | D-018 | D-010 marked Resolved before the tooling existed | Recorded |
+| D-019 | Execution in an Approved Controlled Reduced-Resource Environment | Approved |
+| D-020 | Dataset below the Profile B floor, reduced profiles added | Approved |
+| D-021 | Benchmark parameters reduced to fit available disk | Approved |
+| D-022 | O01–O08 have an authoritative vendor source | Recorded |
+| D-023 | `mcli` sourced from the pinned product image | Approved |
+| D-024 | Documentation restructured to the phase model | Recorded |
 
 ---
 
@@ -399,7 +405,7 @@ decides what runs when.
 
 **Effect.** The repository's folder structure and execution order remain exactly
 as SRD section 10 defines them. Replication (`DEV-909`) is covered inside
-`docs/05-minio-distributed-mode/` beside `DEV-908`, because adding a folder for it
+`docs/04-minio-distributed-mode/` beside `DEV-908`, because adding a folder for it
 would add structure the SRD does not define (guardrail 17). No test, evidence
 item or result changes; only the order in which the same work is scheduled
 differs from the Jira ticket numbering.
@@ -477,7 +483,7 @@ MinIO targets as `down`. The endpoint is authenticated by default.
 nodes of **both** clusters — deliberately identical, so the metric surface stays
 comparable between products (guardrail 6) and so neither product gains an
 advantage from a lab-side difference. The raw `403` state and the post-fix `up`
-state are both recorded in `docs/01-repository-and-lab/evidence/TC-ST01-06-minio.txt`.
+state are both recorded in `docs/01-repo-versions-and-lab/evidence/TC-ST01-06-minio.txt`.
 
 **Effect.** Metrics collection works and no monitoring port is published:
 `HostConfig.PortBindings` for `lab-prometheus` is `{}`, verified in
@@ -564,3 +570,232 @@ taking ST02's storage-testing claims at face value would conclude the
 containerised path was built and exercised. The claim is withdrawn here until the
 tooling exists; the underlying decision to containerise is still sound and the
 `fio` and NFS test cases in ST02 remain unimplemented rather than failed.
+
+---
+
+## D-019 — Execution proceeds in an Approved Controlled Reduced-Resource Environment
+
+| Field | Value |
+|---|---|
+| Affects | Every phase; supersedes the *basis* of D-004 without contradicting it |
+| Status | Approved |
+| Recorded | 2026-10-03 |
+| Supersedes | The treatment of the virtualisation prohibition in D-004; the numeric figures in D-004 still stand |
+
+**Problem.** D-004 records two facts: the host is below the Profile B reference, and
+the host is a VMware guest, which the requirements name as a prohibited
+virtualisation environment. Under the earlier stop condition, the second fact halted
+the Epic.
+
+**Decision.** Execution is authorised in an **Approved Controlled Reduced-Resource
+Execution Environment**. The VMware guest and the reduced resources are approved
+conditions of execution. Profile A and Profile B requirements are unchanged. This is
+**not** a new profile, and no artefact may state that Profile A or Profile B was
+completed.
+
+**Action.** Every phase records, in its environment section: required specification,
+measured actual value, container limits, the deviation and its reason, the effect on
+results, and residual risk to the conclusion. Two consequences are stated up front
+rather than discovered later:
+
+1. Performance figures cannot support capacity or production-sizing conclusions.
+2. The dataset is below the Profile B floor (see D-020).
+
+**Effect.** The Epic proceeds instead of halting, and the environmental gap becomes
+auditable per phase instead of being a single unreconciled footnote. The obligation
+to be explicit about the gap is *increased*, not relaxed, because a controlled
+environment is only defensible if it is documented precisely.
+
+**Measured against D-004.** The vCPU and RAM shortfall in D-004 is unchanged and is
+re-measured per phase. The virtualisation prohibition is the element superseded here.
+
+---
+
+## D-020 — Dataset below the Profile B floor, reduced profiles added
+
+| Field | Value |
+|---|---|
+| Affects | DEV-906, DEV-910, DEV-911, DEV-913 |
+| Status | Approved |
+| Recorded | 2026-10-03 |
+
+**Problem.** The Profile B dataset floor is 5–10 GB, enforced in `gen-dataset` by
+`PROFILE_B_MIN_BYTES = 5 GiB` and by `--min-bytes`. On a single 48 GB filesystem
+with parity-2 erasure amplification, a 5.26 GiB dataset occupies roughly 11 GB per
+cluster, and DEV-909 requires two clusters resident at once. The Profile B dataset
+requirement could not coexist with the rest of the work.
+
+**Decision.** Add reduced dataset profiles as **additional generator keys**. The
+existing `full`, `profileb` and `smoke` profiles are never resized in place, because
+doing so would invalidate every digest already recorded against them.
+
+**Action and measured sizes.** Verified by recomputing the generator's plan function
+rather than by assertion:
+
+| Profile | Objects | Realised | Parity-2 cluster | Used by |
+|---|---|---|---|---|
+| `profileb` (unchanged) | 2,409 | 5.264 GiB | 10.8 GiB | reference |
+| `reduced2g` | 2,383 | 2.014 GiB | 4.027 GiB | DEV-906/907/908/910/911/912/913 |
+| `reduced1g` | 2,375 | 1.014 GiB | 2.027 GiB | DEV-909, two concurrent deployments |
+
+Non-large categories are unchanged, so key shapes, retention modes, tags, LIST depth
+and the 128 MiB large-object size are preserved. `--min-bytes` is set to each
+profile's own floor, so the tool records `meets_profile_b_floor: false` against the
+Profile B floor itself. The required-versus-actual record is therefore produced by the
+tool, not asserted in prose.
+
+**Effect.** The Profile B dataset requirement is **not met** and is recorded as not
+met wherever it applies. The declared cost: large-object count falls from 40 to 14 or
+6, which reduces multi-object erasure coverage and large-object sample size. Any
+conclusion about large-object throughput rests on fewer samples than Profile B
+intended, and that limitation travels with the number.
+
+**Verification.** Recomputing `profileb` reproduced the previously recorded result of
+2,409 objects and 5,651,848,823 bytes exactly, confirming the reduced-profile
+arithmetic is derived from the same generator logic as the original evidence.
+
+---
+
+## D-021 — Benchmark parameters reduced to fit available disk
+
+| Field | Value |
+|---|---|
+| Affects | DEV-910, DEV-913 |
+| Status | Approved |
+| Recorded | 2026-10-03 |
+
+**Problem.** The `warp` profile in `lab/compose/.env.example` specifies 200 objects of
+64 MiB, which is 12.5 GB of logical data and roughly 25 GB once parity-2 erasure
+amplification is applied. The host had 608 MB free. The configured benchmark could
+not run at all — this was a hard blocker on the performance phases, not merely an
+accuracy caveat.
+
+**Decision.** Reduce the benchmark parameters so the phases are executable, and record
+the reduction rather than presenting reduced numbers as if they were the configured
+ones.
+
+**Action.** Parameters are set per phase against measured free space, and each
+performance artefact records the configured value, the used value, the reason, and
+the effect on comparability. Repeated runs and variance are retained, because the
+reduction affects scale, not repeatability.
+
+**Effect.** Throughput figures describe a smaller working set than Profile B
+intended. Small differences between MinIO and Silo are more likely to be noise at
+this scale. Together with D-019 this means performance output is *indicative under a
+controlled environment* and is not evidence of production capacity.
+
+---
+
+## D-022 — O01–O08 have an authoritative vendor source; recorded "no basis" withdrawn
+
+| Field | Value |
+|---|---|
+| Affects | DEV-912 |
+| Status | Recorded |
+| Recorded | 2026-10-03 |
+| Amends | D-006 |
+
+**Problem.** D-006 records that the O01–O08 objectives were derived from the SRD
+rather than supplied, and that O05 and O08 had no basis in the supplied requirements,
+so no evidence could exist for them. The README repeated this. On checking, the
+reason was incomplete: the SRD genuinely does not define all eight, but the vendor
+publishes all eight compatibility conditions, including the two that appeared to
+have no basis.
+
+**Decision.** The vendor's published compatibility page is the authoritative source
+for the **wording** of O01–O08. It is a **vendor claim**, not a verified behaviour.
+The wording is captured with URL and retrieval date; the behaviour is then
+independently tested against both products, and every conclusion comes from our test
+results rather than from the vendor's description.
+
+**Action.** Capture all eight conditions in DEV-912 with retrieval date and evidence
+reference. For each condition record an applies / does-not-apply decision backed by a
+test against both products.
+
+**Effect.** O05 and O08 move from "not assessable" to assessable. The claim that they
+had no basis is withdrawn. The residual limitation is stated plainly: the requirement
+text originates with the vendor being evaluated, so it is labelled a documented claim
+wherever it is cited, and never used as proof that the products behave as described.
+
+---
+
+## D-023 — `mcli` sourced from the pinned product image rather than downloaded
+
+| Field | Value |
+|---|---|
+| Affects | DEV-905, DEV-911, DEV-912 |
+| Status | Approved |
+| Recorded | 2026-10-03 |
+
+**Problem.** `mcli` is absent from the host, and Silo's documentation directs users to
+run `mcli` against Silo. Downloading it separately would introduce an unpinned
+external binary into a project whose rules require pinned, reproducible tooling.
+
+**Decision.** Extract `mcli` from the same pinned Silo image the product is tested
+from, and record its version and checksum.
+
+**Basis.** The image layer history shows `COPY /go/bin/mcli /usr/bin/mcli`,
+`chmod +x /usr/bin/silo /usr/bin/mcli`, `ln -sf mcli /usr/bin/mc`, and `curl` baked
+in. The image is the classic variant, not `-distroless`.
+
+**Two consequences.**
+
+1. The distroless question is settled by evidence rather than preference: the
+   distroless variant ships the binary alone, with no shell, `mc` or `curl`, so the
+   shell-based entrypoint and in-container client workflow this lab uses require the
+   classic variant.
+2. The image symlinks its `mcli` as `mc`. Using Silo's `mcli` against Silo while
+   using MinIO's `mc` against MinIO would mean the two products were driven by
+   different clients, which violates the Identical-Test Rule. **One client drives both
+   products**: MinIO's `mc` is used against both, and `mcli` is used only where it is
+   the only option, with both versions recorded in the fairness record. Any behaviour
+   that differs under `mc` is a DEV-912 compatibility finding, not a tooling artefact.
+
+**Effect.** The client-fairness requirement is satisfied structurally rather than by
+assertion, and no unpinned binary enters the project.
+
+---
+
+## D-024 — Documentation restructured to the phase model; governance documents at root
+
+| Field | Value |
+|---|---|
+| Affects | Whole repository |
+| Status | Recorded |
+| Recorded | 2026-10-03 |
+| Reverses | Commit `20a46b9`, which removed the governance documents |
+
+**Problem.** The repository carried an `ST01`–`ST10` documentation structure while the
+project requirements define a `DEV-905`–`DEV-915` phase model with 11 phase
+directories. Documentation removed by `20a46b9` was recoverable only from Git history.
+Repository status tables also conflicted with measured reality.
+
+**Decision.** Migrate the documentation with `git mv` so history is preserved, restore
+the governance documents to the repository root, and reconcile the status tables to
+measured state rather than to the old tracker.
+
+**Action and mapping.** Eleven phase directories now match the phase plan. Phase
+directory names were taken from the project requirements, not invented:
+
+| Old | New |
+|---|---|
+| `01-repository-and-lab` | `01-repo-versions-and-lab` |
+| `02-test-data-and-verification` | unchanged |
+| `03-minio-feature-validation` | unchanged |
+| `04-minio-performance-baseline` | `06-minio-performance-baseline` |
+| `05-minio-distributed-mode` | `04-minio-distributed-mode` |
+| *new* | `05-minio-replication` |
+| `06-silo-functional-validation` | `07-silo-functional-validation` |
+| `07-s3-client-compatibility` | `08-compatibility-diff` |
+| `08-silo-benchmark` | `09-silo-performance-comparison` |
+| `09-security-licensing-maintenance` | `10-security-licence-review` |
+| `10-capability-matrix-evaluation` | `11-evaluation-report` |
+
+References were rewritten in code, scripts and prose. **Captured evidence files were
+not edited**: `docs/01-repo-versions-and-lab/evidence/secret-scanning.txt` still
+records the path as it stood at capture time, which is correct, because editing
+evidence after capture would falsify it.
+
+**Effect.** Documentation matches the phase model, links resolve, and the directory
+order reflects the execution order rather than the numeric issue-key order. Prior
+evidence remains intact and traceable.

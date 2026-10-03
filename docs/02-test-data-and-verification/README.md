@@ -55,7 +55,7 @@ Recorded `2026-10-01T19:48:12Z`, before the ST02 test runs below.
 
 The MinIO and `mc` images are built from pinned upstream release tags because no pullable
 image exists for them; the full source-to-image provenance chain is in
-`docs/01-repository-and-lab/evidence/minio-build-provenance.txt` and `DEVIATIONS.md` D-002,
+`docs/01-repo-versions-and-lab/evidence/minio-build-provenance.txt` and `DEVIATIONS.md` D-002,
 D-003. Locally built images are pinned by immutable `RELEASE.*` tag and recorded image ID;
 they have no registry digest.
 

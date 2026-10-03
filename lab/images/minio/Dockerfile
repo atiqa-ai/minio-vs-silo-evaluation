@@ -9,7 +9,7 @@
 # cannot be used either.
 #
 # This image is therefore built from the archived source tree at the last
-# open-source release tag. See docs/01-repository-and-lab/evidence/ for the
+# open-source release tag. See docs/01-repo-versions-and-lab/evidence/ for the
 # recorded provenance chain (git tag, commit, Go toolchain, binary sha256,
 # image digest).
 #
