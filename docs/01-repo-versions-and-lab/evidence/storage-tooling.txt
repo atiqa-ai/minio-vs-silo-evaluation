@@ -1,0 +1,78 @@
+== storage-layer tooling: fio and NFS (DEVIATIONS.md D-010, D-018) ==
+captured: 2026-10-03T21:43:06Z
+
+SUMMARY
+  fio  BUILT AND PROVEN. A real I/O job ran and reported measurements.
+  NFS  SERVER PROVEN, END-TO-END MOUNT NOT PROVEN. The client mount hangs.
+       NFS-backed storage is therefore NOT currently measurable here.
+
+-- fio: PROVEN --
+  image:  fio-local:3.41-r0  (15.4MB)
+  base:   alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+  pkg:    fio=3.41-r0 (pinned exactly; apk fails rather than silently upgrading)
+  version: fio-3.41
+
+  real job, 64 MiB sequential write, direct=1, libaio iodepth 8:
+    io_bytes=67108864  bw_bytes=1597830095  bw=1560380KiB/s  runtime=42ms
+  This is a measurement, not a build success. The tool works.
+
+-- NFS: capability check (R12) --
+  An NFS SERVER is kernel-backed; an NFS client mount is not. This is why
+  an image alone is insufficient.
+    nfsd in /proc/filesystems before:  absent
+    module present: /lib/modules/7.0.0-34-generic/kernel/fs/nfsd/nfsd.ko.zst
+    modprobe nfsd from a privileged container: exit=0, now present
+    modprobe nfs  from a privileged container: exit=0, now present
+  HOST MUTATION: the nfs, nfsd and nfs4 modules are loaded and persist until
+  'modprobe -r nfs nfsd'. Recorded rather than done silently.
+
+-- NFS: what WORKS --
+  image:  nfs-local:2.6.4-r6
+  base:   same pinned alpine digest
+  pkg:    nfs-utils=2.6.4-r6, rpcbind=1.2.9-r0
+  proven: mount -t nfsd succeeds; exportfs -r succeeds;
+          /export is exported rw to <world>;
+          rpc.nfsd starts and registers NFSv4 on port 2049;
+          port 2049 reachable from another container;
+          /proc/fs/nfsd exposes threads, versions, v4_end_grace.
+
+-- NFS: what DOES NOT work --
+  A client mount never completes. Attempts, in order:
+    1. mount -t nfs -o vers=4,port=2049            -> hangs
+    2. same, plus nolock                          -> hangs
+    3. mount -t nfs -o vers=3,port=2049            -> 'rpc.statd is not
+       running', then 'mounting ... failed: Not supported'
+  The hang is uninterruptible: the mount syscall does not return, so bounding
+  it with timeout does not help and the container cannot be stopped.
+
+  CONSEQUENCE FOR DEV-910: the local-versus-NFS-backed storage comparison
+  required by the performance baseline CANNOT be measured in this
+  environment. Those cases are recorded Not Available, with this reason,
+  rather than reported as failed tests or quietly omitted.
+
+-- NFS: defect found and fixed during this work --
+  The first entrypoint ran 'rpcbind -w'. That deadlocked the host. Stack from
+  the wedged process:
+    rpcb_v4_register -> rpc_call_sync -> rpc_wait_bit_killable -> poll
+  rpcbind blocked in a synchronous RPC call to unregister its own service,
+  waiting on a portmapper reply inside the container network namespace that
+  could never arrive. Syscall was poll with a 30s timeout, retried forever,
+  so the process sat in uninterruptible disk-sleep; docker stop and SIGKILL
+  both failed and the nfs/nfsd modules stayed pinned.
+
+  Fixed by removing rpcbind entirely: NFSv4 registers on port 2049 directly,
+  and v3 is the version that needs the portmapper. The verified working
+  invocation is:
+    rpc.nfsd -N 3 --nfs-version 4     -> starts
+    rpc.nfsd --nfs-version 4        -> errno 111 (needs portmapper for v3)
+    rpc.nfsd -N 2 -N 3 --nfs-version 4 -> '2: Unsupported version'
+  -N 2 must not be used: this kernel has already dropped NFSv2.
+
+  The wedge cleared on its own once the retry loop gave up; nfs-test was then
+  removable. Final host state verified: 0 processes in uninterruptible
+  sleep, no stuck containers, 18 GB free.
+
+-- honest status --
+  The rpcbind fix removed a self-inflicted deadlock. It did NOT make the
+  client mount work. NFS remains unproven end to end, and no claim to the
+  contrary appears anywhere in this repository.

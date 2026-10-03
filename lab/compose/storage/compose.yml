@@ -1,0 +1,67 @@
+# Storage-layer measurement services — fio and NFS.
+#
+# These are NOT part of either object-storage cluster. They exist to measure the
+# storage layer BOTH products sit on, which the DEV-910 performance baseline
+# requires. Keeping them in their own project makes that explicit: nothing here
+# is a product under test, and no result from these services may be attributed
+# to MinIO or to Silo.
+#
+# Neither service may be added to lab/compose/minio or lab/compose/silo. The
+# pre-commit check-no-mixed-cluster hook enforces that no cluster mixes products.
+#
+# fio       PROVEN. Runs real jobs and reports measurements.
+# NFS       SERVER PROVEN, CLIENT MOUNT NOT PROVEN. The server starts, exports,
+#           and registers NFSv4, but a client mount never completes in this
+#           environment. See docs/01-repo-versions-and-lab/evidence/storage-tooling.txt
+#           for the recorded attempts. Until that is resolved, every
+#           NFS-backed storage case is recorded Not Available with that reason.
+#           It is not reported as a failed test and not quietly omitted.
+#
+# Both images are built from lab/images/{fio,nfs}/Dockerfile, each pinned by base
+# digest and exact package version.
+
+name: storage-lab
+
+services:
+  # Storage-layer benchmark runner. Job files are bind-mounted from
+  # lab/jobs/fio/ so the profile text lives in version control as evidence
+  # rather than being baked into an image layer.
+  fio:
+    image: fio-local:3.41-r0
+    build:
+      context: ../images/fio
+    container_name: fio-runner
+    # --direct=1 in the job files bypasses the page cache, which requires
+    # privileges this service is granted deliberately and narrowly.
+    privileged: true
+    volumes:
+      - ../data/fio-target:/data
+      - ../jobs/fio:/jobs:ro
+    # No default command: fio is invoked per job with an explicit job file, so
+    # that the recorded command line is the thing that produced the numbers.
+    entrypoint: ["fio"]
+    command: ["--version"]
+    networks: [migration-net]
+
+  # NFS server exporting storage for the NFS-backed comparison.
+  # Requires --privileged and /lib/modules because an NFS server is
+  # kernel-backed. The host nfsd module must already be loaded:
+  #   docker run --rm --privileged -v /lib/modules:/lib/modules:ro alpine:3 modprobe nfsd
+  nfs:
+    image: nfs-local:2.6.4-r6
+    build:
+      context: ../images/nfs
+    container_name: nfs-server
+    privileged: true
+    volumes:
+      - /lib/modules:/lib/modules:ro
+      - ../data/nfs-export:/export
+      - ../images/nfs/exports/exports:/etc/exports:ro
+    command: ["--nfs-version", "4"]
+    networks: [migration-net]
+
+networks:
+  # Same network the product clusters use, so the storage services and the
+  # products under test can reach each other without publishing host ports.
+  migration-net:
+    external: true
