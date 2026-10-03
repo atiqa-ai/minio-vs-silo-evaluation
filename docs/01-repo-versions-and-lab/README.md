@@ -40,11 +40,11 @@ Host, captured in `evidence/TC-ST01-01-minio.txt`:
 | containerd / runc | 2.2.2 / 1.4.0 |
 | Docker root dir | `/var/lib/docker` |
 | Root filesystem | `/dev/sda2`, 48 G total, 18 G free at capture |
-| Virtualisation | VMware guest — a prohibited environment per SRD |
+| Virtualisation | VMware guest |
 
-Because the host is below Profile B on CPU and memory, and is itself
-virtualised, **every measurement in this evaluation is indicative only**. See
-`DEVIATIONS.md` D-004.
+The host is below the 8 vCPU / 32 GiB reference on both CPU and memory, and
+is itself virtualised, so **every measurement in this evaluation is indicative
+only**.
 
 Images used, all pinned and digested:
 
@@ -361,7 +361,7 @@ Observations recorded for later subtasks:
 
 **Limitations.** See the single environment line under *Environment* above and
 *Findings and problems* below. Every result in this sub-task is indicative, and
-none of it establishes Profile A or Profile B performance.
+none of it establishes reference-host performance.
 
 ## 10. Conclusion
 
@@ -389,12 +389,12 @@ browser device flow. Run `gh auth refresh -s read:project,project`, then
 Two limits are inherited from the host and must be restated in the final
 recommendation:
 
-- **Benchmarks are indicative only** (D-004). 4 vCPU, 7.7 GiB RAM, VMware,
-  cgroup v2 — below Profile B.
-- **The dataset is not yet Profile B compliant** (D-005). The first generator
-  iteration realised **885.82 MiB / 669 objects**, against a 5 GB floor. ST02 is
-  regenerating at the 5 GB minimum, and until that passes, no benchmark number
-  from this dataset counts as Profile B evidence.
+- **Benchmarks are indicative only.** 4 vCPU, 7.7 GiB RAM, VMware, cgroup v2 —
+  below the 8 vCPU / 32 GiB reference host.
+- **The dataset did not initially meet the 5 GB floor.** The first generator
+  iteration realised **885.82 MiB / 669 objects**. ST02 is regenerating at the 5 GB
+  minimum, and until that passes, no benchmark number from this dataset counts as
+  evidence from a compliant dataset.
 
 `fio` and the NFS test cases are **no longer blocked** (D-010): they will run in
 containers rather than needing host packages. That supersedes the earlier

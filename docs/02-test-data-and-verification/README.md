@@ -54,10 +54,10 @@ Recorded `2026-10-01T19:48:12Z`, before the ST02 test runs below.
 | OS | Ubuntu 26.04.1 LTS |
 | Kernel | Linux 7.0.0-31-generic x86_64 |
 | Local machine | Intel(R) Core(TM) i5-8365U @ 1.60GHz, 4 vCPU, 7.7 GiB RAM |
-| Virtualisation | `oracle` (VMware) — **inside the prohibited range**, see D-004 |
+| Virtualisation | `oracle` (VMware) |
 | Filesystem | ext4, 48 GB total, 15 GB available at ST02 start |
 | cgroup | cgroup v2 |
-| Topology | 4 nodes × 1 drive, one erasure pool, nginx load balancer, Profile B |
+| Topology | 4 nodes × 1 drive, one erasure pool, nginx load balancer |
 
 ### Images
 
@@ -206,8 +206,8 @@ with raw output in `evidence/`. Nothing is back-filled from memory.
 | `mcli checksum verify` | Not yet run | — |
 | Silo seeding | Not yet run | — |
 
-The dataset is regenerated at the Profile B minimum of 5 GB before the final runs; the
-886 MB figure above is the superseded first iteration.
+The dataset is regenerated at the 5 GB minimum before the final runs; the 886 MB
+figure above is the superseded first iteration.
 
 ---
 
@@ -307,7 +307,7 @@ is reported as measured behaviour rather than as a prediction.
 
 **Limitations.** See the single environment line under *Environment* above and
 *Findings and problems* below. Every result in this sub-task is indicative, and
-none of it establishes Profile A or Profile B performance.
+none of it establishes reference-host performance.
 
 ## 10. Conclusion
 
