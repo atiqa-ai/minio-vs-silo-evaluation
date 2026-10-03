@@ -200,6 +200,29 @@ cases not yet evidenced.
 Repository evidence — Compose files, digests, `docker compose ps`, environment
 information and command output — is present under `lab/compose/` and `evidence/`.
 
+### Screenshots
+
+This phase has no `screenshots/` directory. Its placeholder README was removed
+in `f59d0f2`; the redaction checklist it carried was preserved here rather than
+discarded, and the template now lives at
+[`docs/templates/screenshots-readme.md`](../templates/screenshots-readme.md).
+
+A screenshot is supporting evidence only and is never sufficient for a
+PASS/FAIL claim (evidence guide, section 1). The authoritative evidence for the
+results above is the raw output under `evidence/`.
+
+Before any image is committed it must be checked for (evidence guide section 13,
+guardrails 20):
+
+* access keys, secret keys, passwords, tokens, private keys
+* internal IPs, hostnames, domains, email addresses
+* unredacted IAM or bucket metadata
+
+`pre-commit` runs gitleaks over staged content and `tools/bin/install-hooks`
+installs the same scan as a git-native hook. A clean scan is necessary but not
+sufficient: gitleaks detects credential patterns, not an internal hostname
+visible in a terminal window.
+
 Two qualifications on that verdict:
 
 * The public-repository requirement was initially unmet by explicit decision and

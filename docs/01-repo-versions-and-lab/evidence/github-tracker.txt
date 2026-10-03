@@ -85,3 +85,26 @@ STILL BLOCKED
     gh auth refresh -s read:project,project
   Until then the residual gap recorded against D-001 stands: the twelve
   issues exist but are not attached to a project board.
+
+ADDENDUM — owner commit f59d0f2 (2026-10-03)
+  A second owner deletion arrived after the first push: f59d0f2 removes
+  docs/01-repo-versions-and-lab/screenshots/README.md. Unlike f1d2f65, this
+  targets the CURRENT path, so unlike f1d2f65 it is not a stale-path artefact and
+  cannot be explained away as a rename-detection mis-mapping.
+
+  The file is not filler. It carries the screenshot redaction checklist cited by
+  guardrails 20 and evidence-guide sections 1 and 13: what to check for before
+  committing an image, and that a screenshot alone never justifies a PASS/FAIL
+  claim. Deleting it as clutter would have removed documented guidance.
+
+  Resolution: the deletion is honoured, and the checklist is preserved in two
+  places before the removal stands -- in docs/01-repo-versions-and-lab/README.md
+  and in the new docs/templates/screenshots-readme.md. Ten other placeholders
+  (phases 02-11) retain it, so the guidance now survives in 11 files.
+
+  OPEN, for the owner to confirm: the deletions are not consistent. Phase 10's
+  placeholder was restored during the f1d2f65 merge, phase 01's is now deleted,
+  and phases 02-09 and 11 are untouched. If the intent is to remove these
+  placeholders, it should be done for all of them at once; if the intent was to
+  remove one specific stale directory, then f59d0f2 removed a live one. Not
+  resolved unilaterally.
