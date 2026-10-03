@@ -36,6 +36,13 @@ repos:
         pass_filenames: false
         always_run: true
 
+      - id: check-env-claims
+        name: enforce approved environment terminology
+        entry: tools/bin/check-env-claims
+        language: script
+        pass_filenames: false
+        always_run: true
+
       - id: trailing-whitespace
         name: trim trailing whitespace
         entry: bash -c 'for f in $(git diff --cached --name-only --diff-filter=ACM | grep -Ev "\.(png|jpg|jpeg|gif|svg)$"); do [ -f "$f" ] || continue; sed -i "s/[[:space:]]*$//" "$f"; done'

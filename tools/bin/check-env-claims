@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+# Enforce the approved execution-environment terminology.
+#
+# WHY THIS EXISTS
+# ---------------
+# R10 found that the environment's status had been described in several
+# different ways, including profile names that were never approved. A reader
+# cannot tell an approved deviation from an invented requirement, and a
+# fabricated profile name is indistinguishable from a real one once it is
+# written down. D-019 approved one specific term; this makes it the only term.
+#
+# Three rules:
+#
+#   1. No invented profile names. "Profile C" does not exist and must not
+#      appear. Real profiles are A and B only.
+#   2. No compliance claims against A or B. This environment is NOT Profile A
+#      or Profile B compliant -- 4 vCPU and ~7.7 GiB RAM against a reference
+#      of 8 vCPU and 32 GiB (D-004). The results are indicative, not compliant.
+#   3. Any file that mentions the reduced-resource environment must use the
+#      exact approved term from D-019.
+#
+# Negation is allowed, because the honest statements matter most: "not Profile
+# B compliant", "no Profile C exists", "do not invent Profile C" are all
+# correct and must pass. It is the affirmative claim that fails.
+#
+# Scans tracked text files, skipping this script, which necessarily contains
+# the forbidden strings as patterns.
+
+set -uo pipefail
+cd "$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "not a git repo" >&2; exit 1; }
+SELF="tools/bin/check-env-claims"
+
+# A line is exempt if it also negates. Matches "not", "never", "no", "cannot",
+# "forbidden", "prohibited", "rejected", and similar.
+NEGATION='\b(no|not|never|without|cannot|can not|can'"'"'t|absent|forbidden|prohibit(ed)?|reject(ed)?|must not|do not|does not|is not|isn'"'"'t|are not|aren'"'"'t|instead of|rather than|only term)\b'
+
+status=0
+report() { # file, rule, line-number, text
+  echo "  $1:$3  [$2]"
+  echo "      $4"
+  status=1
+}
+
+files=$(git ls-files | grep -E '\.(md|ya?ml|txt|sh|json|jsonl)$' | grep -v "^$SELF$")
+[ -z "$files" ] && exit 0
+
+# Reduce to files that can possibly matter, so the output stays readable.
+candidates=$(printf '%s\n' "$files" | xargs grep -liE 'profile[ -]?c|reduced[- ]resource|profile [ab].{0,30}(compliant|complian)|(compliant|complian).{0,30}profile [ab]' 2>/dev/null || true)
+
+if [ -z "$candidates" ]; then
+  echo "check-env-claims: no environment-claims to check"
+  exit 0
+fi
+
+echo "check-env-claims:"
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  [ -f "$f" ] || continue
+
+  # Rules 1 and 2: forbidden affirmative claims, per line, skipping comments.
+  while IFS=: read -r ln text; do
+    [ -z "$ln" ] && continue
+    case "$text" in '#'*|'*'*) continue ;; esac
+    if printf '%s' "$text" | grep -qiE 'profile[ -]?c\b' \
+       && ! printf '%s' "$text" | grep -qiE "$NEGATION"; then
+      report "$f" "invented profile name" "$ln" "$text"
+    fi
+    if printf '%s' "$text" | grep -qiE 'profile [ab].{0,30}(compliant|complian)|(compliant|complian).{0,30}profile [ab]' \
+       && ! printf '%s' "$text" | grep -qiE "$NEGATION"; then
+      report "$f" "Profile A/B compliance claim" "$ln" "$text"
+    fi
+  done < <(grep -niE 'profile[ -]?c|profile [ab].{0,30}(compliant|complian)|(compliant|complian).{0,30}profile [ab]' "$f" 2>/dev/null || true)
+
+  # Rule 3: mentions the reduced-resource environment, so must use the exact
+  # approved term. Whitespace-flexible because the term is line-wrapped in prose.
+  if grep -qiE 'reduced[- ]resource' "$f" 2>/dev/null; then
+    if ! tr '\n' ' ' < "$f" | grep -qiE 'Approved[[:space:]]+Controlled[[:space:]]+Reduced-Resource[[:space:]]+Execution[[:space:]]+Environment'; then
+      report "$f" "missing exact approved term (D-019)" "-" \
+        "mentions 'reduced-resource' but never 'Approved Controlled Reduced-Resource Execution Environment'"
+    fi
+  fi
+done <<< "$candidates"
+
+if [ "$status" -eq 0 ]; then
+  echo "  OK: environment terminology is consistent"
+fi
+exit "$status"

@@ -47,7 +47,7 @@ if ! "$ROOT/tools/bin/gitleaks" protect --staged \
   fail=1
 fi
 
-for check in check-no-latest check-no-mixed-cluster; do
+for check in check-no-latest check-no-mixed-cluster check-env-claims; do
   echo "pre-commit: $check"
   "$ROOT/tools/bin/$check" || fail=1
 done
