@@ -6,6 +6,12 @@
 
 ---
 
+> **Section map.** Sections 1-12 below are the original write-up, left
+> exactly as recorded. The per-subtask template also requires Scope, Acceptance
+> Criteria, Limitations / Assumptions, Files Changed and a Review Gate; those are
+> added here as unnumbered sections in their template positions rather than
+> renumbering the original twelve, so existing cross-references stay valid.
+
 ## 1. Goal
 
 Produce synthetic test data that is **byte-identical for both products**, and build the
@@ -26,6 +32,15 @@ Required test cases: `TC-ST02-01` … `TC-ST02-05` from the project test-case
 specification, which is held externally and is not committed here.
 
 ---
+
+## Scope
+
+Only the requirements of this sub-task and the project specification. Work
+outside that boundary is recorded under Findings, not implemented.
+
+Not in scope for this sub-task: performance measurement (DEV-910, DEV-913),
+Silo functional validation (DEV-911), compatibility difference testing
+(DEV-912), and security/licensing review (DEV-914).
 
 ## 2. Environment
 
@@ -210,6 +225,12 @@ Populated as each test completes. Every row is backed by raw command output in
 
 ---
 
+## Acceptance Criteria
+
+| Criterion | Status | Evidence / Notes |
+|---|---|---|
+| _(author to complete)_ | NOT AVAILABLE | Phase not yet reviewed against a gate |
+
 ## 9. Findings and problems
 
 Recorded in the order found. Failures and dead ends are kept, not deleted.
@@ -280,6 +301,14 @@ is reported as measured behaviour rather than as a prediction.
 
 ---
 
+## Limitations / Assumptions
+
+**Assumptions.** None recorded beyond those stated inline.
+
+**Limitations.** See the single environment line under *Environment* above and
+*Findings and problems* below. Every result in this sub-task is indicative, and
+none of it establishes Profile A or Profile B performance.
+
 ## 10. Conclusion
 
 Deferred until TC-ST02-01 … TC-ST02-05 are complete for both products.
@@ -327,3 +356,18 @@ docker run --rm -v "$PWD/lab/data/minio:/d" <rootful-image> \
 `docker compose down -v` is **never** used while data must be preserved. A dataset
 required by an active evidence set is never destroyed before its evidence is captured
 and persisted.
+
+## Files Changed
+
+_(author to complete — list the files this sub-task added or modified)_
+
+## Review Gate
+
+- [ ] Requirements checked
+- [ ] Evidence present for every PASS
+- [ ] Result reproducible from the repository
+- [ ] Public-repo secret scan passed
+- [ ] Documentation complete
+- [ ] Tracker updated
+- [ ] Reviewer gate satisfied
+

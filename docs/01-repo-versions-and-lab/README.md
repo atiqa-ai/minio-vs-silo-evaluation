@@ -1,5 +1,11 @@
 # ST01 — Repository and Lab
 
+> **Section map.** Sections 1-12 below are the original write-up, left
+> exactly as recorded. The per-subtask template also requires Scope, Acceptance
+> Criteria, Limitations / Assumptions, Files Changed and a Review Gate; those are
+> added here as unnumbered sections in their template positions rather than
+> renumbering the original twelve, so existing cross-references stay valid.
+
 ## 1. Goal
 
 Set up the repository, pin every version, and build a working local Docker
@@ -8,6 +14,15 @@ verified and compared under identical conditions.
 
 This subtask does not measure performance or judge compatibility. It establishes
 that the lab is trustworthy, so that later subtasks can rely on it.
+
+## Scope
+
+Only the requirements of this sub-task and the project specification. Work
+outside that boundary is recorded under Findings, not implemented.
+
+Not in scope for this sub-task: performance measurement (DEV-910, DEV-913),
+Silo functional validation (DEV-911), compatibility difference testing
+(DEV-912), and security/licensing review (DEV-914).
 
 ## 2. Environment
 
@@ -273,6 +288,12 @@ running and untouched. TC-ST01-08 records them explicitly as *not* this
 project's ports, so their wildcard bindings cannot be mistaken for a product
 failure here.
 
+## Acceptance Criteria
+
+| Criterion | Status | Evidence / Notes |
+|---|---|---|
+| _(author to complete)_ | NOT AVAILABLE | Phase not yet reviewed against a gate |
+
 ## 9. Findings and problems
 
 Problems found and fixed during this subtask, in the order they were found:
@@ -333,6 +354,14 @@ Observations recorded for later subtasks:
   Go 1.25+ derives `GOMAXPROCS` from the cgroup quota; the Go 1.24-built MinIO
   does not. Recorded as D-011 because it is a plausible contributor to any ST08
   throughput difference and must not be silently attributed to either product.
+
+## Limitations / Assumptions
+
+**Assumptions.** None recorded beyond those stated inline.
+
+**Limitations.** See the single environment line under *Environment* above and
+*Findings and problems* below. Every result in this sub-task is indicative, and
+none of it establishes Profile A or Profile B performance.
 
 ## 10. Conclusion
 
@@ -438,3 +467,18 @@ That is expected, not a sign that the lab is still running.
 **Pre-existing containers are not touched** by any of the above. `grafana`,
 `cadvisor`, `soul-of-lahore` and `nginx-exporter` belong to unrelated stacks and
 must remain running.
+
+## Files Changed
+
+_(author to complete — list the files this sub-task added or modified)_
+
+## Review Gate
+
+- [ ] Requirements checked
+- [ ] Evidence present for every PASS
+- [ ] Result reproducible from the repository
+- [ ] Public-repo secret scan passed
+- [ ] Documentation complete
+- [ ] Tracker updated
+- [ ] Reviewer gate satisfied
+
