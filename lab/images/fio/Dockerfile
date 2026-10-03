@@ -9,7 +9,7 @@
 #
 # WHY A CONTAINER
 # ---------------
-# Both products must be measured with the same tool (Identical-Test Rule), and the
+# Both products must be measured with the same tool, and the
 # host must stay reproducible from the repository. Installing `fio` onto the host
 # would make the measurement depend on host state that a reader cannot reproduce.
 # A pinned image makes the tool version part of the recorded evidence.

@@ -13,7 +13,8 @@
 # Verification evidence: docs/01-repo-versions-and-lab/evidence/
 #
 # Base matches the MinIO baseline image so the client is not a hidden variable
-# between the MinIO and Silo test runs (Identical-Test Rule, guardrails 6).
+# between the MinIO and Silo test runs, so the client is never the reason for a
+# difference between the products.
 
 FROM registry.access.redhat.com/ubi9/ubi-micro@sha256:932aec77f5b86a5dba854a18b14a38725b296967e7dc9c7a1f4d7f0bf82e1ce5
 

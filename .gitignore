@@ -24,7 +24,7 @@ lab/images/mc/mc
 *.zip
 
 # ---------------------------------------------------------------------------
-# Lab credentials — must never be committed (guardrails 20)
+# Lab credentials — must never be committed
 # ---------------------------------------------------------------------------
 # .env.example IS tracked and holds placeholders only.
 lab/compose/.env

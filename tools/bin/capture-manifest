@@ -2,7 +2,7 @@
 # capture-manifest - read a seeded bucket back from the server and emit one JSON
 # object per key with all seven fields the ST02 manifest must carry.
 #
-# Guardrail 11 (Identical-Test Rule): the same script and the same client binary
+# G11: the same script and the same client binary
 # run against MinIO and against Silo, so the only variable between the two runs
 # is the storage backend. Nothing here interprets the result; comparison is
 # verify-manifest's job.
@@ -30,7 +30,7 @@
 # `mc stat --json` (key, size, etag, versionId, metadata, retention) plus one
 # `mc tag list` (tags, which stat omits).
 #
-# Usage: tools/bin/capture-manifest <minio|silo> <bucket>
+# Usage: tools/bin/capture-manifest <minio|silo|rep> <bucket>
 #
 # Writes JSON Lines to stdout so it can be redirected straight into evidence/.
 
@@ -43,9 +43,15 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 case "$PRODUCT" in
   minio) CLIENT=mc-client ;;
   silo)  CLIENT=silo-client ;;
-  *) echo "usage: $0 <minio|silo> <bucket>" >&2; exit 2 ;;
+  # The DEV-909 replication target is itself MinIO, so it is driven by the same
+  # mc client over the same network. Only the alias differs, and the alias
+  # resolution check below is what proves the right deployment is being read:
+  # a typo'd or unconfigured 'rep' alias aborts instead of quietly reporting an
+  # empty bucket.
+  rep)   CLIENT=mc-client ;;
+  *) echo "usage: $0 <minio|silo|rep> <bucket>" >&2; exit 2 ;;
 esac
-[ -n "$BUCKET" ] || { echo "usage: $0 <minio|silo> <bucket>" >&2; exit 2; }
+[ -n "$BUCKET" ] || { echo "usage: $0 <minio|silo|rep> <bucket>" >&2; exit 2; }
 
 # Same guard as seed-dataset: refuse to run against an alias that does not
 # resolve to a network endpoint, because mc would silently fall back to a

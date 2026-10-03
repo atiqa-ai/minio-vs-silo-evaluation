@@ -2,10 +2,10 @@
 # Reject any Compose project or nginx upstream block that mixes MinIO and Silo
 # nodes.
 #
-# Guardrails 4: every cluster must be a single product at a single version. A
+# G4: every cluster must be a single product at a single version. A
 # file that references both minio-* and silo-* hostnames would produce a hybrid
 # cluster whose results are meaningless, and would also invalidate the
-# Identical-Test Rule (guardrails 6).
+# comparable-environment rule (G6).
 #
 # The MinIO and Silo cluster files live in separate directories, and the proxy
 # file may reference both because it balances to two separate upstream pools that
@@ -40,10 +40,10 @@ check_file() {
 }
 
 echo "check-no-mixed-cluster:"
-for f in lab/compose/minio/compose.yml lab/compose/silo/compose.yml; do
-  check_file "$f"
-done
-for f in lab/compose/proxy/nginx-minio.conf lab/compose/proxy/nginx-silo.conf; do
+# Discovered, not hardcoded. A cluster project added later must not be able to
+# escape this check by simply not being listed here -- which is exactly what
+# happened with replication-target, the DEV-909 target deployment.
+for f in lab/compose/*/compose.yml lab/compose/proxy/nginx-*.conf; do
   check_file "$f"
 done
 

@@ -1,12 +1,16 @@
 # MinIO CE baseline cluster — 4 nodes x 1 drive, single erasure pool.
 #
-# Reference topology from SRD 5 Profile B (4 nodes x 1 drive + load-balancer).
+# Reference topology: 4 nodes x 1 drive + load-balancer. The specification sets no
+# topology itself; this is the topology this evaluation fixes for both products.
 # Silo gets an identical file in ../silo/compose.yml: same node count, same
 # drive count, same CPU/memory limits, same volume type, same bind-mount layout.
 # Only the image and the server binary differ. Any drift between the two files
 # would invalidate the ST08 comparison, so keep them in step.
 #
-# Ports: only the CONSOLE of node 1 is published, bound to 127.0.0.1 (SRD 4.4).
+# Ports: only the CONSOLE of node 1 is published, bound to 127.0.0.1. The
+# specification says nothing about port exposure, so this is a lab decision rather
+# than a requirement: keeping the S3 API off the host means it is never reachable
+# from outside the lab network.
 # The S3 API (9000) is deliberately NOT published; clients reach it over
 # migration-net, either directly or through the proxy project's load balancer.
 
@@ -29,8 +33,9 @@ x-minio-common: &minio-common
     # whether MinIO and Silo interpret the same MINIO_* surface identically.
     MINIO_BROWSER_REDIRECT_URL: ""
     # The cluster metrics endpoint answers 403 unless this is set. It is required
-    # by the `monitoring` project mandated by SRD 4.4. Applied identically to the
-    # Silo cluster so the metrics surface stays comparable (guardrail 6).
+    # by the `monitoring` project. Applied identically to the Silo cluster so the
+    # metric surface stays comparable: same machine, topology, limits, storage,
+    # dataset and benchmark parameters for both products.
     MINIO_PROMETHEUS_AUTH_TYPE: "public"
   healthcheck:
     # ubi-micro has no curl and no wget. bash's /dev/tcp gives a real TCP probe
@@ -79,7 +84,7 @@ services:
     volumes:
       - ../../data/minio/node-4:/data
 
-# One shared network for the whole lab (SRD 4.4), created outside Compose with
+# One shared network for the whole lab, created outside Compose with
 # `docker network create migration-net` so every component project joins the same
 # network. Declared external because Compose must not own or recreate it.
 networks:

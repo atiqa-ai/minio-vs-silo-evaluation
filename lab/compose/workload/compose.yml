@@ -1,8 +1,8 @@
 # Workload project — clients and benchmark drivers.
 #
 # Hosts the tools the project is required to use: mc, mcli and warp.
-# Nothing in this project publishes a port (SRD 4.4: only consoles and the proxy
-# publish). Everything reaches the clusters over migration-net.
+# Nothing in this project publishes a port — by lab decision only the consoles and
+# the proxy publish. Everything reaches the clusters over migration-net.
 #
 # The client containers are long-lived so that many commands can be executed
 # against them without re-creating a container each time. The mc config lives in
@@ -33,8 +33,9 @@ services:
     volumes:
       - mc-config:/config
       # The synthetic dataset, read-only. Both products are seeded from this same
-      # directory, which is how the Identical-Test Rule is satisfied without ever
-      # copying data between the two products (guardrails 11).
+      # directory, which is how both products are given identical data without ever
+      # copying data between them. The dataset is regenerated per product, never
+      # transferred, so neither gains from a warm copy.
       - ../../data/dataset:/dataset:ro
       # Job scripts, so verification logic lives in the repository rather than
       # being pasted into shell history.

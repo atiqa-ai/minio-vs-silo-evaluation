@@ -17,10 +17,10 @@
 # -----------------
 # ubi9-micro is the same base Silo's image uses, so that the MinIO and Silo
 # containers differ only in the object-storage implementation under test. This
-# is required by the Identical-Test Rule (guardrails 6) for ST08 performance
+# is required for a fair ST08 performance
 # comparison to be fair.
 #
-# Pinned by digest, not tag: the base is a third-party image and the SRD 4.3
+# Pinned by digest, not tag: the base is a third-party image and a version rule
 # immutability rule applies to it as well.
 
 FROM registry.access.redhat.com/ubi9/ubi-micro@sha256:932aec77f5b86a5dba854a18b14a38725b296967e7dc9c7a1f4d7f0bf82e1ce5

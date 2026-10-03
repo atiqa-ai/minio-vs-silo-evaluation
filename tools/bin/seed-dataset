@@ -4,7 +4,7 @@
 #
 # Both products are seeded by this identical script using the identical client
 # binary (mc), because the seed procedure itself must not be a variable
-# (Guardrail 11, Identical-Test Rule). Product-specific client behaviour is
+# (G11, one script for both products). Product-specific client behaviour is
 # measured separately in ST07, not here.
 #
 # Usage: tools/bin/seed-dataset <minio|silo> [bucket]

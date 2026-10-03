@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """Generate the synthetic evaluation dataset.
 
-Guardrails 7 / SRD: only synthetic test data. Nothing here is derived from real
-data, and the generator reads no external input.
+Only synthetic test data. Nothing here is derived from real data, and the
+generator reads no external input.
 
-Determinism matters more than realism. The Identical-Test Rule (guardrails 6)
+Determinism matters more than realism. The comparable-environment rule (G6)
 requires MinIO and Silo to be tested against the same test data. Rather than
-uploading one dataset twice and copying it through a network path that
-guardrails 11 forbids, both products are seeded from this generator, which
-produces byte-identical output on every run. That property is asserted, not
-assumed: --verify-deterministic regenerates a sample and compares digests.
+uploading one dataset twice and copying it through a network path, both products
+are seeded from this generator, which produces byte-identical output on every
+run. That property is asserted, not assumed: --verify-deterministic regenerates
+a sample and compares digests.
 
 The dataset size is asserted too, not asserted in prose. --min-bytes (default:
 the Profile B 5 GiB floor) makes the generator exit non-zero when the realised
@@ -278,7 +278,7 @@ def verify_deterministic(out: str, profile: str, quiet: bool = False):
     """Prove the generator is byte-reproducible.
 
     Regenerates into a temporary directory and compares every object's SHA-256
-    against the existing manifest. The Identical-Test Rule depends on this, so it
+    against the existing manifest. The comparable-environment rule depends on this, so it
     is checked rather than taken on faith.
     """
     import tempfile

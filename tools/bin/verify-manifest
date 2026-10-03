@@ -2,7 +2,7 @@
 # verify-manifest - compare a server-captured manifest against the local
 # ground-truth manifest and print one line per mismatch.
 #
-# Guardrail 11 (Identical-Test Rule): run once per product with the identical
+# G11: run once per product with the identical
 # script, then diff the two outputs. A field that differs between MinIO and Silo
 # is itself a result, not a defect of this tool.
 #
@@ -18,9 +18,9 @@
 #              because "retain until" is a wall-clock instant that shifts
 #              between the seed run and the capture run
 #
-# Usage: tools/bin/verify-manifest <minio|silo> <bucket> [local-manifest]
+# Usage: tools/bin/verify-manifest <minio|silo|rep> <bucket> [local-manifest]
 #
-#        tools/bin/verify-manifest <minio|silo> <bucket> --captured FILE
+#        tools/bin/verify-manifest <minio|silo|rep> <bucket> --captured FILE
 #
 # --captured verifies a manifest that capture-manifest already produced instead
 # of issuing a second full read of the bucket. Capture is two mc round trips per
@@ -49,9 +49,12 @@ fi
 case "$PRODUCT" in
   minio) CLIENT=mc-client ;;
   silo)  CLIENT=silo-client ;;
-  *) echo "usage: $0 <minio|silo> <bucket> [--captured FILE]" >&2; exit 2 ;;
+  # 'rep' is the DEV-909 replication target: a MinIO deployment, so the same mc
+  # client, addressed by the 'rep' alias.
+  rep)   CLIENT=mc-client ;;
+  *) echo "usage: $0 <minio|silo|rep> <bucket> [--captured FILE]" >&2; exit 2 ;;
 esac
-[ -n "$BUCKET" ] || { echo "usage: $0 <minio|silo> <bucket>" >&2; exit 2; }
+[ -n "$BUCKET" ] || { echo "usage: $0 <minio|silo|rep> <bucket>" >&2; exit 2; }
 [ -f "$LOCAL" ] || { echo "missing local manifest: $LOCAL" >&2; exit 2; }
 
 if [ -n "$PRE_CAPTURED" ]; then

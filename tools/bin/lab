@@ -2,9 +2,12 @@
 # Lab control helper for the MinIO vs Silo evaluation.
 #
 # Every Compose project is driven from here so that start/stop order is applied
-# consistently. Guardrails 15: never run more than one heavy stack at a time.
-# Guardrails 20: keep runs isolated — every destructive command must name the
-# product it targets, so "down" can never be ambiguous about which stack it hits.
+# consistently. Never run more than one heavy stack at a time — the single
+# exception is `rep-target`, which DEV-909 requires and which this script
+# enforces separately below.
+#
+# Every destructive command must name the product it targets, so "down" can
+# never be ambiguous about which stack it hits.
 #
 # Usage:
 #   lab network            create the shared migration-net (idempotent)
@@ -13,7 +16,9 @@
 #   lab up proxy           start the load balancers
 #   lab up workload        start the long-lived client containers
 #   lab up monitoring      start the metrics scraper (publishes no ports)
-#   lab down minio|silo|proxy|workload|monitoring
+#   lab up rep-target      start the SECOND MinIO deployment used as the
+#                          replication target (DEV-909 only)
+#   lab down minio|silo|proxy|workload|monitoring|rep-target
 #   lab wipe minio|silo    destroy one product's data directory, then recreate
 #                          the empty node dirs. Refuses while that cluster runs.
 #   lab restart-workload   recreate client containers so bind mounts refresh
@@ -45,8 +50,9 @@ project_for() {
     proxy)     echo proxy ;;
     workload)  echo workload ;;
     monitoring) echo monitoring ;;
+    rep-target) echo replication-target ;;
     restart-workload) echo workload ;;
-    *)         die "unknown target '$1' (expected minio|silo|proxy|workload|monitoring|restart-workload)" ;;
+    *)         die "unknown target '$1' (expected minio|silo|proxy|workload|monitoring|rep-target|restart-workload)" ;;
   esac
 }
 
@@ -93,7 +99,7 @@ case "${1:-}" in
     ;;
 
   up)
-    target="${2:-}"; [ -n "$target" ] || die "usage: lab up <minio|silo|proxy|workload|monitoring>"
+    target="${2:-}"; [ -n "$target" ] || die "usage: lab up <minio|silo|proxy|workload|monitoring|rep-target>"
     dir="$(project_for "$target")"
 
     # nginx resolves its upstream names while loading the config and exits with
@@ -113,20 +119,32 @@ case "${1:-}" in
       exit 0
     fi
 
+    # DEV-909 needs the replication source and target resident together. That
+    # exception is deliberately narrow and is enforced here rather than trusted to
+    # whoever runs the phase: the target may only come up alongside the MinIO
+    # source. Allowing it against the Silo cluster would create a two-product
+    # co-resident lab, which is the configuration that makes a comparison
+    # meaningless and that check-no-mixed-cluster exists to prevent.
+    if [ "$target" = "rep-target" ] && docker ps --format '{{.Names}}' | grep -qx 'silo-1'; then
+      die "silo is running; 'lab down silo' first — the replication target may only run alongside the MinIO source"
+    fi
+
     dc "$dir" up -d
     case "$target" in
       minio)     wait_healthy minio-cluster ;;
       silo)      wait_healthy silo-cluster ;;
+      rep-target) wait_healthy minio-replication-target ;;
       monitoring) wait_healthy monitoring 120 ;;
+      storage)   sleep 3; dc "$dir" ps ;;
       *) sleep 3; dc "$dir" ps ;;
     esac
     ;;
 
   down)
-    target="${2:-}"; [ -n "$target" ] || die "usage: lab down <minio|silo|proxy|workload|monitoring>"
+    target="${2:-}"; [ -n "$target" ] || die "usage: lab down <minio|silo|proxy|workload|monitoring|rep-target>"
     dir="$(project_for "$target")"
-    # Guardrails 20: refuse to remove data volumes. Cluster data lives in bind
-    # mounts under lab/data, which Compose never owns, so no -v is ever passed.
+    # Never remove data volumes. Cluster data lives in bind mounts under
+    # lab/data, which Compose never owns, so no -v is ever passed.
     dc "$dir" down --remove-orphans
     ;;
 
@@ -135,7 +153,8 @@ case "${1:-}" in
     case "$target" in
       minio) PRODUCT=minio;  PROJECT=minio-cluster ;;
       silo)  PRODUCT=silo;   PROJECT=silo-cluster ;;
-      *) die "usage: lab wipe <minio|silo>" ;;
+      rep-target) PRODUCT=minio-rep; PROJECT=minio-replication-target ;;
+      *) die "usage: lab wipe <minio|silo|rep-target>" ;;
     esac
     DATA="$ROOT/lab/data/$PRODUCT"
     PARENT="$(dirname "$DATA")"
@@ -188,14 +207,14 @@ say "wiping $DATA"
 
   status)
     say "compose projects"
-    for dir in minio silo proxy workload monitoring; do
+    for dir in minio silo replication-target proxy workload monitoring storage; do
       printf '%s:\n' "$dir"
       dc "$dir" ps --format '  {{.Name}}\t{{.Status}}' 2>/dev/null || echo "  (not created)"
     done
     ;;
 
   ps)
-    target="${2:-}"; [ -n "$target" ] || die "usage: lab ps <minio|silo|proxy|workload|monitoring>"
+    target="${2:-}"; [ -n "$target" ] || die "usage: lab ps <minio|silo|proxy|workload|monitoring|rep-target>"
     dc "$(project_for "$target")" ps
     ;;
 

@@ -454,7 +454,7 @@ def build(f):
     # ---------------- 5. Structure ----------------
     h1(doc, "5. Repository structure")
     para(doc,
-         "SRD section 10 requires every subtask to have its own folder "
+         "The repository model requires every subtask to have its own folder "
          "containing README.md, screenshots/ and evidence/. All ten comply.")
 
     rows, colors = [], {}
@@ -490,7 +490,7 @@ def build(f):
          size=10)
     para(doc,
          "Two things are missing that should be there: a GitHub Project board "
-         "mirroring the Jira subtasks (SRD section 12), which cannot be verified "
+         "mirroring the tracker subtasks, which cannot be verified "
          "because the current GitHub token lacks the read:project scope, and the "
          "fio and NFS container tooling that D-010 claims resolves.",
          size=10)
@@ -512,7 +512,7 @@ def build(f):
          "shards. The amplification ratio measured is 2.01x."
          % (f["minio_bucket"] or "the bucket total", f["minio_ondisk"]), size=10)
     para(doc,
-         "This matters beyond bookkeeping. SRD section 5 sizes the Profile B "
+         "This matters beyond bookkeeping. The reference profile sizes the "
          "dataset at 5-10 GB, but that is the logical size. The capacity actually "
          "required per product is about double, which is what exhausts the volume "
          "on this host and forces one heavy stack at a time. Every capacity "
@@ -559,7 +559,7 @@ def build(f):
 
     h2(doc, "6.5 Commit prefix does not match the SRD example")
     para(doc,
-         "SRD section 12 says commit messages should start with the subtask "
+         "Commit messages should start with the subtask "
          "number. Every commit starts with the Jira key instead, for example "
          "'DEV-905: ST01 ...'. Recorded as D-017 rather than corrected: the "
          "subtask number is retained as the second token, so traceability is "
@@ -636,7 +636,7 @@ def build(f):
     # ---------------- 9. Final output ----------------
     h1(doc, "9. SRD final-output readiness")
     para(doc,
-         "SRD section 16 lists ten things the finished project must provide. "
+         "The definition of done lists what the finished project must provide. "
          "Their readiness today:")
 
     outputs = [
@@ -682,7 +682,7 @@ def build(f):
          "wiped after its evidence is filed, which reclaims roughly 11 GB."),
         ("Run the Silo turn",
          "Same script, same mc binary, same dataset, same verification. This is "
-         "the Identical-Test Rule and it is what makes the comparison valid."),
+         "the comparable-environment rule and it is what makes the comparison valid."),
         ("Re-run ST01-06/07/08 against Silo",
          "Closes the three NOT RUN cells and makes ST01 fully evidenced on both "
          "products."),

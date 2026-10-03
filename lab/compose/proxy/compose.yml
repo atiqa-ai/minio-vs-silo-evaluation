@@ -2,14 +2,16 @@
 #
 # Separate upstream blocks for MinIO and Silo. These are the only services, other
 # than the node consoles, that publish a port, and every published port is bound
-# to 127.0.0.1 (SRD 4.4).
+# to 127.0.0.1. A lab decision, not a requirement.
 #
 # The two upstreams are byte-identical apart from hostname and port, so the proxy
-# is not a variable between the MinIO and Silo benchmark runs (guardrails 6).
+# is not a variable between the MinIO and Silo benchmark runs: same machine,
+# topology, limits, storage, dataset, parameters and repetition count.
 #
-# Note on benchmark endpoints: ST04/ST08 drive load through this proxy, because
-# SRD 5 specifies a load-balancer container as part of the reference topology.
-# Both products are measured through an identical proxy path.
+# Note on benchmark endpoints: ST04/ST08 drive load through this proxy, because the
+# reference topology this evaluation fixes includes a load-balancer container.
+# Both products are measured through an identical proxy path, so the proxy is
+# never the reason for a difference.
 
 name: proxy
 

@@ -1,6 +1,7 @@
 # Pre-commit hooks for the MinIO vs Silo evaluation repository.
 #
-# The active, enforced hook is the secret scanner. Guardrails 20 requires that
+# The active, enforced hook is the secret scanner. Safety around credentials
+# requires that
 # lab credentials never reach version control, and ST01 requires secret scanning
 # to be active before any commit is made.
 #

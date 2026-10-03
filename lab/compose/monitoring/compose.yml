@@ -1,20 +1,21 @@
-# Monitoring — required by SRD 4.4, which separates the lab into Compose
-# projects: minio-*, silo-*, proxy, workload, monitoring.
+# Monitoring — one of the lab's Compose projects: minio-*, silo-*, proxy,
+# workload, monitoring. The specification does not require this project; it is
+# here so metric claims can be compared rather than believed.
 #
 # Purpose: capture the `minio_*` Prometheus metric surface that both products
 # claim to expose, so the claim can be compared rather than believed
-# (guardrails 13, 24). Metric-name parity is evidence for ST07
-# TC-ST07-03 "configuration compatibility".
+# Metric-name parity is evidence for ST07 TC-ST07-12 "Prometheus metric
+# compatibility": a claim that a metric exists is only settled by reading it.
 #
 # Isolation rules this file obeys:
 #   * Only MinIO and Silo clusters are scraped. This project never mixes
-#     products in one cluster (guardrail 4) — it observes them separately.
-#   * NOTHING is published. SRD 4.4 permits only consoles and the proxy to
+#     products in one cluster — it observes them separately.
+#   * NOTHING is published. By lab decision only the consoles and the proxy
 #     publish ports, and any published port must bind 127.0.0.1. Prometheus
 #     therefore has no `ports:` key at all and is reachable only on
 #     migration-net.
-#   * This project is deliberately NOT started alongside both heavy stacks
-#     (guardrail 15). It runs alongside whichever single cluster is up; the
+#   * This project is deliberately NOT started alongside both heavy stacks.
+#     It runs alongside whichever single cluster is up; the
 #     other product's targets are expected to report `down`, which is itself
 #     recorded as evidence that only one stack runs at a time.
 

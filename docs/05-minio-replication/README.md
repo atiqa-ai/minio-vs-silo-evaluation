@@ -43,7 +43,12 @@ of RAM, below the 8 vCPU / 32 GiB reference host. They are indicative.
 
 * Two MinIO deployments resident at the same time: a replication source and a replication target. This is MinIO-only co-residency; the prohibition is on mixing MinIO and Silo nodes in one cluster, which a pre-commit hook enforces.
 * The dataset for this phase uses the reduced profile sized for two concurrent deployments; the measured size and the parity-2 on-disk amplification are recorded in *Environment* when the phase runs.
-* Both deployments validated, and the source's replication credentials present in ignored local configuration.
+* Both deployments validated: `lab up minio` for the source and `lab up rep-target` for the
+  target, which is the tracked project at `lab/compose/replication-target/`. Its credentials
+  come from `REPLICATION_TARGET_ROOT_USER` and `REPLICATION_TARGET_ROOT_PASSWORD` in the
+  ignored local `.env`, set from `lab/compose/.env.example`.
+* `tools/bin/lab up rep-target` refuses to run while the Silo cluster is up, so the
+  two-deployment exception cannot leak into a product comparison.
 * A seeded dataset on the source, so replication is proven against real objects.
 * Versioning enabled on the source buckets, because version and delete-marker replication cannot be tested without it.
 
@@ -75,22 +80,33 @@ Test cases from the project test inventory. Each row states the expected result
 
 ```bash
 # The target is a second, separate MinIO deployment - never a Silo node.
-# It needs its own compose project and its own credentials in ignored local config.
-docker compose -f lab/compose/minio/compose.yml up -d            # source
-docker compose -f lab/compose/replication-target/compose.yml up -d  # target
+# It is a real project in the repository, with its own credentials in the
+# ignored local .env. `lab` refuses to start it while Silo is up, so the
+# two-stack exception cannot leak into a product comparison.
+tools/bin/lab up minio        # replication source
+tools/bin/lab up rep-target   # replication target (rep-minio-1..4)
+
+# Point a client alias at the target before configuring replication
+docker exec mc-client mc alias set rep http://rep-minio-1:9000 \
+  "$REPLICATION_TARGET_ROOT_USER" "$REPLICATION_TARGET_ROOT_PASSWORD"
 
 # Enable replication on the source, including the object classes under test
 docker exec mc-client mc admin replicate add minio/eval-src \
-  --remote-bucket 'http://<target>:9000/eval-dst' --replicate \
+  --remote-bucket http://rep-minio-1:9000/eval-dst --replicate \
   tags,metadata,deleteMarker,versioning,existingObjects
 
 # Negative control: alter the target outside replication, then prove detection
 printf tampered > /tmp/tampered
 docker cp /tmp/tampered mc-client:/tmp/tampered
-docker exec mc-client mc pipe minio/eval-dst/<key> < /tmp/tampered
+docker exec mc-client mc pipe rep/eval-dst/<key> < /tmp/tampered
 
-# The comparison MUST report the mismatch; an empty report means the check is broken
-tools/bin/verify-manifest minio eval-dst manifest-dst.jsonl   # must report the mismatch
+# The comparison MUST report the mismatch. An empty report means the check is
+# broken, which is a worse outcome than the mismatch itself.
+tools/bin/capture-manifest rep eval-dst > evidence/manifest-dst.jsonl
+tools/bin/verify-manifest rep eval-dst evidence/manifest-dst.jsonl
+
+# Tear down. Never while evidence for either end is still unverified.
+tools/bin/lab down rep-target
 ```
 
 ### Evidence rules

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Reject ':latest' (or otherwise unpinned) container image references.
 #
-# SRD 4.3 requires every image to be pinned to an immutable tag, and the whole
+# Version rule: every image must be pinned to an immutable tag, and the whole
 # point of the evaluation is that a result can be reproduced later from an exact
 # image. ':latest' silently breaks that.
 #

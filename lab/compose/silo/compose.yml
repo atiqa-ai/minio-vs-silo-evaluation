@@ -5,10 +5,10 @@
 # memory limits, same bind-mount layout, same published console, same health
 # check, same server arguments.
 #
-# Guardrails 4: every cluster must be a single product at a single version.
+# G4: every cluster must be a single product at a single version.
 # Nothing in this file may ever reference a MinIO node, and nothing in
 # ../minio/compose.yml may ever reference a Silo node.
-# Guardrails 6: the Identical-Test Rule. This file must stay in step with the
+# G6 comparable-environment rule: this file must stay in step with the
 # MinIO file; if one is changed, both are changed in the same commit.
 #
 # Only differences from the MinIO file:
@@ -35,7 +35,7 @@ x-silo-common: &silo-common
     MINIO_ROOT_USER: ${MINIO_ROOT_USER}
     MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     # Identical to the MinIO cluster: the cluster metrics endpoint answers 403
-    # without it, and the `monitoring` project (SRD 4.4) needs it. Keeping the
+    # without it, and the `monitoring` project needs it. Keeping the
     # variable identical is what makes the two metric surfaces comparable.
     MINIO_PROMETHEUS_AUTH_TYPE: "public"
   healthcheck:
@@ -85,9 +85,9 @@ services:
     volumes:
       - ../../data/silo/node-4:/data
 
-# Same shared lab network as the MinIO cluster (SRD 4.4). External because
+# Same shared lab network as the MinIO cluster. External because
 # Compose must not own it. The two clusters share the network but never share
-# membership: no service in this file references a minio-* node (guardrails 4).
+# membership: no service in this file references a minio-* node.
 networks:
   migration-net:
     external: true

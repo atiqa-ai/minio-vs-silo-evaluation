@@ -1,0 +1,100 @@
+# MinIO replication TARGET — a second, separate MinIO deployment.
+#
+# WHY THIS EXISTS
+# ---------------
+# DEV-909 tests replication, which needs two deployments resident at the same
+# time: a source and a target. The `minio` project is the source; this project is
+# the target.
+#
+# This is the ONE place in the lab where two MinIO deployments run together. It is
+# deliberate and confined to DEV-909. It is not a licence to co-run the MinIO and
+# Silo clusters: those remain strictly sequential, one heavy cluster at a time.
+#
+# Node names are rep-minio-1..4, deliberately prefixed, so that:
+#   * container names cannot collide with the baseline cluster's minio-1..4
+#   * the pre-commit check-no-mixed-cluster hook still parses these node names,
+#     so if someone later adds a silo-* node here the hook will reject it
+#   * a screenshot or log line unambiguously identifies which deployment it came from
+#
+# Topology, image, CPU/memory limits and volume type are IDENTICAL to
+# lab/compose/minio/compose.yml. A replication comparison is only meaningful if the
+# two ends of the replication stream are the same shape; if this file drifts from
+# the baseline, keep them in step.
+#
+# NO PORTS ARE PUBLISHED. This project is reached over migration-net only, by
+# hostname. Publishing a console here would add a host port that the baseline does
+# not have, and TC-ST01-08 asserts lab ports bind to loopback.
+
+name: minio-replication-target
+
+x-rep-minio-common: &rep-minio-common
+  image: ${MINIO_IMAGE}
+  restart: unless-stopped
+  networks: [migration-net]
+  # Identical limits to the baseline cluster. A replication comparison against a
+  # differently-resourced target would measure the resize, not the replication.
+  deploy:
+    resources:
+      limits:
+        cpus: "${NODE_CPUS}"
+        memory: ${NODE_MEM}
+  environment: &rep-minio-env
+    # Separate credentials from the baseline cluster, so a compromised or
+    # misconfigured target cannot be reached with the source's root credentials.
+    MINIO_ROOT_USER: ${REPLICATION_TARGET_ROOT_USER}
+    MINIO_ROOT_PASSWORD: ${REPLICATION_TARGET_ROOT_PASSWORD}
+    MINIO_BROWSER_REDIRECT_URL: ""
+    # Same value as the baseline, so the metric surface stays comparable if this
+    # deployment is scraped during DEV-909.
+    MINIO_PROMETHEUS_AUTH_TYPE: "public"
+  healthcheck:
+    # ubi-micro has no curl and no wget; bash's /dev/tcp gives a real TCP probe
+    # without adding a package manager to the image.
+    test: ["CMD-SHELL", "timeout 3 bash -c 'cat < /dev/null > /dev/tcp/127.0.0.1/9000' || exit 1"]
+    interval: 10s
+    timeout: 5s
+    retries: 12
+    start_period: 20s
+  command: &rep-minio-command
+    - server
+    - --address
+    - ":9000"
+    - --console-address
+    - ":9001"
+    - http://rep-minio-1:9000/data
+    - http://rep-minio-2:9000/data
+    - http://rep-minio-3:9000/data
+    - http://rep-minio-4:9000/data
+
+services:
+  rep-minio-1:
+    <<: *rep-minio-common
+    container_name: rep-minio-1
+    volumes:
+      - ../../data/minio-rep/node-1:/data
+    command: *rep-minio-command
+
+  rep-minio-2:
+    <<: *rep-minio-common
+    container_name: rep-minio-2
+    volumes:
+      - ../../data/minio-rep/node-2:/data
+
+  rep-minio-3:
+    <<: *rep-minio-common
+    container_name: rep-minio-3
+    volumes:
+      - ../../data/minio-rep/node-3:/data
+
+  rep-minio-4:
+    <<: *rep-minio-common
+    container_name: rep-minio-4
+    volumes:
+      - ../../data/minio-rep/node-4:/data
+
+# Same shared lab network as every other project. External, because Compose must
+# not own or recreate it.
+networks:
+  migration-net:
+    external: true
+    name: migration-net
