@@ -36,4 +36,4 @@ The `ST\1` test cases defined by the project requirements (held externally, not 
 |---|---|
 | `README.md` | This document, 12 required sections |
 | `evidence/` | Raw command output backing every PASS/FAIL |
-| `screenshots/` | Supporting evidence only, sanitised per evidence guide section 13 |
+| `screenshots/` | Supporting evidence only; sanitised before commit (see `../screenshots/README.md`) |

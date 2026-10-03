@@ -69,14 +69,14 @@ cd /home/devops/Documents/minio-vs-silo-evaluation
 ./tools/bin/lab up minio
 ./tools/bin/lab up proxy
 
-# 3. Metrics scraper required by SRD 4.4. Starts alongside whichever single
-#    cluster is up and publishes no ports, so it does not breach SRD 4.4.
+# 3. Metrics scraper. Starts alongside whichever single cluster is up and
+#    publishes no host ports.
 ./tools/bin/lab up monitoring
 
 # 4. Capture ST01 evidence for the MinIO baseline
 ./tools/bin/st01-verify minio
 
-# 5. Tear the baseline down before starting Silo: guardrails 15 forbids
+# 5. Tear the baseline down before starting Silo: only one heavy cluster
 #    running both heavy stacks at once
 ./tools/bin/lab down minio
 ./tools/bin/lab down proxy
@@ -147,7 +147,7 @@ has been rewritten: it is the only way the report can be true of both files.
 This is a documentation defect, not a lab defect. The Silo cluster is understood
 to behave correctly here, exactly as MinIO does, because the same monitoring
 project scrapes both and MinIO's pass is proven. But "understood to" is not
-evidence, and SRD 11 requires raw output for every PASS claim. The three Silo
+evidence, and raw output is required for every PASS claim. The three Silo
 cases are therefore reported as NOT RUN and are queued for re-execution in the
 Silo turn, when the Silo cluster is next up. Until then the Monitoring row of the
 Silo column in the results table must not be read as a PASS.
@@ -166,7 +166,7 @@ Silo:  Formatting 1st pool, 1 set(s), 4 drives per set.
 Every node of both clusters reported `Network: 4/4 OK`, `Drives: 1/1 OK`,
 `Pool: 1`.
 
-The `monitoring` project required by SRD 4.4 came up healthy and collected
+The `monitoring` project came up healthy and collected
 **77 distinct `minio_*` metric names** from the four live MinIO nodes. It
 publishes nothing: `HostConfig.PortBindings` for `lab-prometheus` is `{}`, and
 `Config.ExposedPorts` is only container metadata. Both facts are captured in
@@ -208,11 +208,10 @@ discarded, and the template now lives at
 [`docs/templates/screenshots-readme.md`](../templates/screenshots-readme.md).
 
 A screenshot is supporting evidence only and is never sufficient for a
-PASS/FAIL claim (evidence guide, section 1). The authoritative evidence for the
+PASS/FAIL claim. The authoritative evidence for the
 results above is the raw output under `evidence/`.
 
-Before any image is committed it must be checked for (evidence guide section 13,
-guardrails 20):
+Before any image is committed, check it for:
 
 * access keys, secret keys, passwords, tokens, private keys
 * internal IPs, hostnames, domains, email addresses
@@ -260,9 +259,9 @@ Two qualifications on that verdict:
 | Silo S3 API (all nodes) | none | **no** |
 | `lb-silo` | `127.0.0.1:18081` | yes — proxy |
 | `mc-client`, `silo-client` | none | no |
-| `lab-prometheus` (monitoring) | none — `HostConfig.PortBindings` is `{}` | no — SRD 4.4 |
+| `lab-prometheus` (monitoring) | none — `HostConfig.PortBindings` is `{}` | no |
 
-SRD 4.4 permits only the consoles and the proxy to publish, so the monitoring
+Only the consoles and the proxy may publish ports, so the monitoring
 project has no `ports:` key at all and is reachable only from `migration-net`.
 `Config.ExposedPorts` still lists `9090/tcp`, but that is container metadata,
 not a host binding — the distinction is recorded explicitly in the evidence so
@@ -271,7 +270,7 @@ the two are not confused.
 Pre-existing containers outside this project (`grafana` on `0.0.0.0:3001`,
 `cadvisor` on `0.0.0.0:8080`, `soul-of-lahore`, `nginx-exporter`) were left
 running and untouched. TC-ST01-08 records them explicitly as *not* this
-project's ports, so their wildcard bindings cannot be mistaken for a guardrail
+project's ports, so their wildcard bindings cannot be mistaken for a product
 failure here.
 
 ## 9. Findings and problems
@@ -295,7 +294,7 @@ was unusable: a pre-existing `cadvisor` container already holds
 wildcard-bind check scanned all host listening sockets, so it matched cadvisor's
 `0.0.0.0:8080` and reported FAIL for something this project does not own. The
 check was rewritten to assert only the lab's own ports. The original false
-failure is recorded here rather than deleted, per guardrails 13.
+failure is recorded here rather than deleted.
 
 **9.4 — `lb-silo` crash-looped when started without its cluster.** nginx resolves
 upstream hostnames at config load and exits with `host not found in upstream`.
@@ -348,7 +347,7 @@ immutable tag and digest, and the MinIO baseline carries a complete
 source-to-image provenance chain. Credentials are synthetic and excluded from
 version control by both `.gitignore` and an active pre-commit secret scan.
 
-All five Compose projects required by SRD 4.4 exist and validate, including the
+All five Compose projects exist and validate, including the
 `monitoring` project, which scrapes the live cluster over `migration-net` without
 publishing a single port. The repository is public at
 `https://github.com/atiqa-ai/minio-vs-silo-evaluation` on `main`, with the epic
@@ -420,7 +419,8 @@ docker volume rm mc-config silo-config
 
 **`lab` never passes `-v` to `docker compose down`.** Cluster data lives in bind
 mounts under `lab/data/`, which Compose does not own, so an accidental teardown
-cannot destroy dataset evidence. Guardrails 20 requires this.
+cannot destroy dataset evidence. A dataset required by an active evidence set is
+never destroyed before its evidence is captured and persisted.
 
 Removing `lab/data/` needs one extra step, because both servers write as root
 inside the container and the host user cannot delete root-owned files (D-009):

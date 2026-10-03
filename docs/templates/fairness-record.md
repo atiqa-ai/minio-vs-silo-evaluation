@@ -4,7 +4,8 @@ Copy this into the evidence directory of **every** phase that runs a client
 against either product. R15 exists because Silo ships a binary symlinked as
 `mc`, which invites the silent substitution of two different clients for two
 different products. That produces a comparison of the clients rather than of
-the servers, and it violates the Identical-Test Rule (guardrails 6).
+the servers. Comparisons must use identical machine, topology, limits, storage,
+dataset, benchmark profile, repetitions and measurement approach.
 
 The rule is structural, not a matter of intent: **the same client binary drives
 both products.** MinIO's `mc` is the primary client for both.

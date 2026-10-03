@@ -1,18 +1,16 @@
 # Screenshots directory README — template
 
 Copy this into `docs/<phase>/screenshots/README.md` when a phase is first set
-up. It exists so the structure required by SRD section 10 is present in the
+up. It exists so the required per-subtask folder structure is present in the
 repository even when no screenshot is yet warranted.
 
 **A screenshot is supporting evidence only. A screenshot alone is never
-sufficient evidence for a PASS/FAIL claim** (evidence guide, section 1). The
-authoritative evidence for a result is the raw command output in
-`../evidence/`.
+sufficient evidence for a PASS/FAIL claim.** The authoritative evidence for a
+result is the raw command output in `../evidence/`.
 
 ## Before committing any image
 
-Each image must be checked for the following before it is committed (evidence
-guide section 13, guardrails 20):
+Each image must be checked for the following before it is committed:
 
 * access keys, secret keys, passwords, tokens, private keys
 * internal IPs, hostnames, domains, email addresses

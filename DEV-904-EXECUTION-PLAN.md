@@ -221,7 +221,7 @@ Evidence is the primary record; conclusions are downstream of it.
 | Capture before concluding | Raw output captured before any result is written |
 | Text, not screenshots | Screenshots support, they do not prove |
 | Named per test case | `TC-<test-id>-<product>.txt` |
-| Failures retained | Never deleted or overwritten (guardrail 19) |
+| Failures retained | Never deleted or overwritten |
 | Ground truth committed | The reference every integrity check compares against is in version control |
 | Dated retrieval | Every time-sensitive claim carries its retrieval date |
 | Sanitised | No credentials, hostnames, domains, addresses, or customer data |

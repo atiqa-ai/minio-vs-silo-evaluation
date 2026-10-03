@@ -11,8 +11,8 @@
 Produce synthetic test data that is **byte-identical for both products**, and build the
 verification toolkit that proves the data arrived intact on the server.
 
-The SRD (section 8.3, guardrail 10) requires that no data-integrity claim rest on an
-operation merely having exited successfully. Seven fields must be captured and checked:
+No data-integrity claim may rest on an operation merely having exited
+successfully. Seven fields must be captured and checked:
 
 ```
 Key | Version ID | Size | Checksum | Tags | Metadata | Retention
@@ -68,7 +68,8 @@ they have no registry digest.
 
 `mcli` ships inside the Silo image at `/usr/bin/mcli`. `mc` is **also** present inside the
 Silo image, which is what allows both products to be seeded by one identical script
-(guardrail 6, Identical-Test Rule).
+(both products must use the same machine, topology, limits, storage, dataset
+and benchmark parameters).
 
 ---
 
@@ -76,9 +77,10 @@ Silo image, which is what allows both products to be seeded by one identical scr
 
 * ST01 complete: `migration-net` exists, both Compose projects validate, `tools/bin/lab` works.
 * Working directory `lab/data/dataset/` populated by `tools/bin/gen-dataset`.
-* `.env` present with synthetic credentials. Not committed (guardrails 20).
+* `.env` present with placeholder credentials. Never committed; real credentials
+  may exist only in local ignored configuration.
 * `workload` project running, so `mc-client` and `silo-client` exist.
-* **Only one heavy cluster running at a time** (guardrail 15).
+* **Only one heavy cluster running at a time**.
 
 ---
 
@@ -126,9 +128,9 @@ docker exec mc-client mc diff /dataset minio/eval-seed
 ```
 
 The comparison is bucket **against the local dataset directory**, not MinIO against Silo.
-Running both heavy clusters simultaneously to diff them would breach guardrail 15, and
-diffing a bucket against itself would prove nothing. Evidence guide section 15 requires
-that a reader can reproduce this from a clean machine.
+Running both heavy clusters simultaneously to diff them is not permitted, and diffing a
+bucket against itself would prove nothing. A reader must be able to reproduce this
+from a clean machine.
 
 ### TC-ST02-05 — Silo checksum verification
 
@@ -144,7 +146,8 @@ asymmetry is itself a recorded client difference (ST07), not a skipped test.
 
 ## 5. Expected result
 
-*Authored before the remaining ST02 runs, per guardrail 18. Where an earlier exploratory
+*Authored before the remaining ST02 runs, as each expected result must be written
+before its test runs. Where an earlier exploratory
 run has already happened, that is stated rather than presented as a prediction.*
 
 | Test | Expected result |
@@ -202,15 +205,14 @@ been executed against **both** products and their raw output is in `evidence/`.
 
 ## 8. Results table
 
-Populated as each test completes. Per evidence guide section 5 every row is backed by raw
-command output in `evidence/`, not by a retyped summary.
+Populated as each test completes. Every row is backed by raw command output in
+`evidence/`, not by a retyped summary.
 
 ---
 
 ## 9. Findings and problems
 
-Recorded in the order found. Failures and dead ends are kept, not deleted
-(guardrails 12, 19).
+Recorded in the order found. Failures and dead ends are kept, not deleted.
 
 **9.1 — A whole investigation was run against a filesystem, not a server.**
 An early attempt to reproduce an Object Lock failure used `mc` inside throwaway containers
@@ -254,7 +256,7 @@ agree here — the AWS-documented comma syntax is wrong for both.
 | `--attr "a=1;b=2"` | **correct** — two separate headers |
 
 This was caught by reading the object back with `mc stat`, not by the upload succeeding.
-It is exactly the failure mode guardrail 10 warns about.
+It is exactly the failure mode the evidence-before-claim rule warns about.
 
 **9.5 — The full seed was aborted mid-run.**
 The 669-object seed into `eval-seed` was interrupted rather than allowed to finish. No
@@ -297,7 +299,7 @@ cp lab/compose/.env.example lab/compose/.env
 tools/bin/gen-dataset              # deterministic synthetic data
 tools/bin/seed-dataset minio eval-seed
 
-tools/bin/lab down minio           # guardrail 15: one heavy stack at a time
+tools/bin/lab down minio           # only one heavy stack at a time
 tools/bin/lab up silo
 tools/bin/seed-dataset silo eval-seed
 ```
@@ -313,7 +315,8 @@ tools/bin/lab down minio
 tools/bin/lab down silo
 
 # Destroy persistent data. DESTRUCTIVE - volumes must be gone before
-# `down -v` is ever considered (guardrail 16).
+# `down -v` is ever considered. Destructive commands require an explicit
+# warning, and a dataset whose evidence is not yet captured is never destroyed.
 #
 # The MinIO/Silo bind mounts are written by root inside the containers, so
 # they cannot be removed by the host user. Use a throwaway root container:
@@ -321,4 +324,6 @@ docker run --rm -v "$PWD/lab/data/minio:/d" <rootful-image> \
   bash -c 'rm -rf /d/* /d/.[!.]*'
 ```
 
-`docker compose down -v` is **never** used while data must be preserved (guardrail 16).
+`docker compose down -v` is **never** used while data must be preserved. A dataset
+required by an active evidence set is never destroyed before its evidence is captured
+and persisted.

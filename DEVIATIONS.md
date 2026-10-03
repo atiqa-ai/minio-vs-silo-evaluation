@@ -67,7 +67,7 @@ against an SRD requirement to publish it; it was withdrawn on 2026-10-01 and the
 repository has been public since. The register now states that directly.
 
 **Resolution.** The requester subsequently directed strict compliance with the
-supplied SRD, which requires a public GitHub repository (SRD section 12), commits
+supplied SRD, whose repository model requires a public GitHub repository, commits
 made directly to `main`, and Jira keys in issue titles. This deviation is
 withdrawn and the requirement met:
 
@@ -82,9 +82,9 @@ withdrawn and the requirement met:
 * The Jira epic `DEV-904` and subtasks `DEV-905` … `DEV-915` exist as GitHub
   issues whose titles carry the Jira keys.
 
-**Residual gap.** SRD section 12 also asks that the GitHub Project mirror the
+**Residual gap.** The requirements also ask that the GitHub Project mirror the
 Jira subtasks. Issue titles are done; the issues are not attached to a GitHub
-Project board, because the SRD does not define one and guardrail 1 forbids
+Project board, because the requirements do not define one and forbid
 turning a general best practice into a project requirement. Recorded here rather
 than silently omitted.
 
@@ -94,7 +94,7 @@ than silently omitted.
 
 | Field | Value |
 |---|---|
-| Affects | SRD 4.3 (pinned immutable image) |
+| Affects | Images pinned to an immutable tag |
 | Status | Approved |
 
 **Reason.** No pullable MinIO CE container image exists. Docker Hub
@@ -127,7 +127,8 @@ that produced the binary is recorded above.
 **Base image choice.** `ubi9/ubi-micro` was selected because it is the same base
 the Silo image is built on. Using the same base for both clusters removes base
 OS and libc differences as a variable between the two products
-(Identical-Test Rule, guardrails 6).
+(identical machine, topology, limits, storage, dataset, benchmark profile,
+repetitions and measurement approach).
 
 ---
 
@@ -164,7 +165,7 @@ not a variable between the MinIO and Silo runs. Silo additionally ships its own
 | Affects | ST04, ST05, ST08 |
 | Status | Approved |
 
-**Reason.** SRD 5 Profile B requires a host with at least 8 vCPU and 32 GB RAM.
+**Reason.** The Profile B reference host requires at least 8 vCPU and 32 GB RAM.
 The actual host has 4 vCPU and 7.7 GB RAM. The host is also itself a VMware
 guest, which SRD names as a prohibited virtualisation environment.
 
@@ -245,7 +246,7 @@ does not carry the source requirement documents.
 | O04 | Programs relying on old bugs | Explicit | ST07 |
 | O05 | Unknown | **No basis** | **Gap — not assessed** |
 | O06 | Multi-pool behaviour | Explicit | Out of scope: single-pool topology |
-| O07 | Replication and mixed-version | Explicit | Blocked by guardrails 11 |
+| O07 | Replication and mixed-version | Explicit | Blocked pending DEV-909 results |
 | O08 | Unknown | **No basis** | **Gap — not assessed** |
 
 O05 and O08 cannot be assessed at all: nothing in the supplied requirements states
@@ -258,7 +259,7 @@ requirements, not a gap in the work.
 
 | Field | Value |
 |---|---|
-| Affects | SRD 4.4 port exposure |
+| Affects | Port exposure |
 | Status | Recorded |
 
 **Reason.** The specification implies the load balancer on port 8080. On this host
@@ -314,7 +315,7 @@ cannot delete them with `rm`.
 
 **Consequence.** Cleanup cannot be done by the invoking user. The documented
 cleanup procedure runs a throwaway container as root over the bind mount. This
-matters because guardrails 20 requires reproducible teardown: an operator who
+matters because teardown must be reproducible: an operator who
 follows a naive `rm -rf lab/data` will get permission errors and may conclude the
 lab is still in use.
 
@@ -403,17 +404,17 @@ which runs replication before performance. The SRD requires
 `ST04 (performance) → ST05 (distributed mode, which includes replication)`.
 
 **What was done instead.** The SRD execution order is authoritative, so ST04 is
-executed before ST05. Guardrail 29 states that the approved SRD takes priority
-over model suggestions and general practice, and guardrail 1 forbids changing
+executed before ST05. The approved requirements take priority over vendor documentation
+over general practice, and forbid changing
 the project's testing methodology without a documented requirement. The Jira
 document is used as a **tracking map**: `DEV-905`–`DEV-915` identify work, and
 every commit, issue and subtask README cites its Jira key, but the ST sequence
 decides what runs when.
 
 **Effect.** The repository's folder structure and execution order remain exactly
-as SRD section 10 defines them. Replication (`DEV-909`) is covered inside
+as the requirements define them. Replication (`DEV-909`) is covered inside
 `docs/04-minio-distributed-mode/` beside `DEV-908`, because adding a folder for it
-would add structure the SRD does not define (guardrail 17). No test, evidence
+would add structure the requirements do not define. No test, evidence
 item or result changes; only the order in which the same work is scheduled
 differs from the Jira ticket numbering.
 
@@ -428,13 +429,13 @@ differs from the Jira ticket numbering.
 
 **Reason.** The Jira reference titles `DEV-907` "MinIO feature validation (single
 node)". The SRD's ST03 says only "MinIO feature validation" and specifies no
-node count, while SRD section 5 makes a 4-node cluster plus a load-balancer
+node count, while the reference topology makes a 4-node cluster plus a load-balancer
 container the reference Profile B topology. The SRD therefore both fixes the
 topology and stays silent on node count.
 
 **What was done instead.** ST03 runs against the Profile B 4 nodes x 1 drive
-cluster. Guardrail 1 forbids turning a Jira title into a project requirement the
-SRD does not state, and SRD section 5 is the higher authority on topology.
+cluster. A Jira title must not be turned into a project requirement the
+specification does not state.
 
 **Effect.** Feature results (versioning, object lock, lifecycle, core S3
 operations) are validated on the distributed topology the SRD mandates. They are
@@ -479,7 +480,7 @@ the local daemon and are recorded in `lab/compose/.env.example`, which is tracke
 | Status | Approved |
 | Recorded | 2026-09-30 |
 
-**Reason.** SRD 4.4 requires a `monitoring` Compose project, and SRD 4.4 also
+**Reason.** A `monitoring` Compose project is required, and it also
 forbids any project other than the consoles and the proxy from publishing ports.
 That combination leaves the scraper with no host-reachable path, so it must scrape
 over `migration-net`. Doing so initially failed: every node answered
@@ -488,7 +489,7 @@ MinIO targets as `down`. The endpoint is authenticated by default.
 
 **What was done instead.** `MINIO_PROMETHEUS_AUTH_TYPE=public` was set on all four
 nodes of **both** clusters — deliberately identical, so the metric surface stays
-comparable between products (guardrail 6) and so neither product gains an
+comparable between products and so neither product gains an
 advantage from a lab-side difference. The raw `403` state and the post-fix `up`
 state are both recorded in `docs/01-repo-versions-and-lab/evidence/TC-ST01-06-minio.txt`.
 
@@ -506,9 +507,9 @@ metrics auth", because both were changed identically and no comparison was made.
 |---|---|
 | Status | Recorded |
 | Recorded | 2026-10-01 |
-| Affects | SRD 6 (storage requirements), ST02, ST08 |
+| Affects | Storage requirements, ST02, ST08 |
 
-**Reason.** SRD 5 (Profile B) sizes the dataset at 5–10 GB and assumes that figure
+**Reason.** The Profile B reference sizes the dataset at 5–10 GB and assumes that figure
 is what the lab must hold for two products. That is the logical object size, not
 the on-disk size. Each cluster is four nodes with one drive each, so MinIO selects
 a default parity of two and distributes every object across the set as two data
@@ -537,15 +538,15 @@ and MinIO's real footprint by half.
 |---|---|
 | Status | Recorded |
 | Recorded | 2026-10-01 |
-| Affects | SRD 12 (public repository requirements) |
+| Affects | Public repository requirements |
 
-**Reason.** SRD 12 states that commit messages "should start with the subtask
+**Reason.** The requirements state that commit messages "should start with the subtask
 number", giving `ST05: add site replication steps` as the example. Every commit in
 this repository instead begins with the Jira key, for example
 `DEV-905: ST01 add the required monitoring project and correct the dataset claim`.
 
 **Reason for the departure.** Jira key-first was chosen so that every commit is
-greppable from the issue tracker, and SRD 12 separately requires the Jira key in
+greppable from the issue tracker, and separately require the Jira key in
 issue titles. The subtask number is retained as the second token, so both remain
 present.
 
