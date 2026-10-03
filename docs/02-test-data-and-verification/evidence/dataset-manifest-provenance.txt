@@ -1,0 +1,24 @@
+== ground-truth manifest preservation ==
+captured: 2026-10-03T20:52:47Z
+reason:   R14 - the manifest is the DEV-906 ground truth and was untracked,
+          living only in the gitignored lab/data/dataset/. It is preserved
+          here and committed BEFORE any reclamation of lab/data.
+
+-- source --
+path:     lab/data/dataset/dataset-manifest.jsonl
+profile:  profileb
+seed:     minio-vs-silo-evaluation/ST02
+objects:  2409
+bytes:    1087113
+sha256:   af72bb52a3e3c211c7ff8e8b7b60fed2f8aed2396f3c0a58490bc97b33542dac
+
+-- per-object fields --
+key, size, md5, sha256, purpose, retention_mode, retention_days, tags, metadata
+
+-- integrity check at preservation time --
+generator recomputation (tools/bin/gen-dataset, profileb) reproduced
+2409 objects / 5651848823 bytes exactly, matching ST02-dataset-generation.txt.
+
+-- retention --
+Retained unchanged. Future reduced2g / reduced1g profiles are additional
+generator keys and do not alter this file.

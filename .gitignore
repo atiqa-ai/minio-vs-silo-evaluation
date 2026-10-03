@@ -48,6 +48,15 @@ mc-config/
 silo-config/
 
 # ---------------------------------------------------------------------------
+# Agent working material — not project content
+# ---------------------------------------------------------------------------
+# DEV-904-project-documentation-pack/ is the instruction pack handed to the
+# execution agent. It is reference material for the agent, not a project
+# deliverable, and is deliberately never committed. The project records that
+# matter from it are re-derived into DEVIATIONS.md and DEV-904-EXECUTION-PLAN.md.
+DEV-904-project-documentation-pack/
+
+# ---------------------------------------------------------------------------
 # Editor and OS noise
 # ---------------------------------------------------------------------------
 .DS_Store

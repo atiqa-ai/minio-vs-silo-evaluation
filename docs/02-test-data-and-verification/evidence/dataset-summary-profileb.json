@@ -1,0 +1,10 @@
+{
+  "manifest": "lab/data/dataset/dataset-manifest.jsonl",
+  "meets_profile_b_floor": true,
+  "object_count": 2409,
+  "profile": "profileb",
+  "profile_b_floor_bytes": 5368709120,
+  "seed": "minio-vs-silo-evaluation/ST02",
+  "total_bytes": 5651848823,
+  "total_gib": 5.264
+}
