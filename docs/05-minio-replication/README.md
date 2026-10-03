@@ -102,8 +102,14 @@ docker exec mc-client mc pipe rep/eval-dst/<key> < /tmp/tampered
 
 # The comparison MUST report the mismatch. An empty report means the check is
 # broken, which is a worse outcome than the mismatch itself.
-tools/bin/capture-manifest rep eval-dst > evidence/manifest-dst.jsonl
-tools/bin/verify-manifest rep eval-dst evidence/manifest-dst.jsonl
+#
+# Note the argument order. The seeded manifest already on disk is what the target
+# is checked AGAINST; --captured is what was read back FROM the target. Passing
+# the capture in the other position would compare the target against itself and
+# report success no matter how badly it diverged - the negative control would be
+# guaranteed to pass, which is the one thing it must never do.
+tools/bin/capture-manifest rep eval-dst > /tmp/manifest-dst.jsonl
+tools/bin/verify-manifest rep eval-dst --captured /tmp/manifest-dst.jsonl
 
 # Tear down. Never while evidence for either end is still unverified.
 tools/bin/lab down rep-target
