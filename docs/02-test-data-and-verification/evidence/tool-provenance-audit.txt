@@ -1,0 +1,62 @@
+== tool provenance audit: capture-manifest and verify-manifest ==
+captured: 2026-10-03T21:52:33Z
+
+PURPOSE
+  These two tools were modified before the DEV-905 documentation migration
+  and were swept into commit a8bc2f9 by a broad 'git add -A'. That commit's
+  message describes documentation, the execution plan and D-019..D-024, and does
+  not mention them. This records what actually happened so the change is not
+  mistaken for reviewed work.
+
+WHAT a8bc2f9 CHANGED
+  capture-manifest  +37/-4  key enumeration for keys containing spaces and '+',
+                             with the mc ls output format documented inline
+  verify-manifest   +39/-11 --captured FILE support, so a manifest already produced
+                             by capture-manifest can be re-verified without a
+                             second full read of 2409 objects
+
+  The --captured rationale is sound: capture costs two mc round trips per
+  object, so re-reading to recheck work just done costs ~30 minutes and
+  yields no new information. It also means the evidence refers to a file that
+  exists on disk and can be re-checked, which the previous behaviour did not.
+
+VALIDATION PERFORMED
+  bash -n capture-manifest                        syntax OK
+  bash -n verify-manifest                         syntax OK
+  verify-manifest bogus bucket                    exit 2  (bad usage)
+  verify-manifest minio b --captured              exit 2  (no file given)
+  verify-manifest minio b --captured /nonexistent exit 2  (missing file)
+
+  The changes were NOT reverted. They are sound and useful, and the defect
+  below is not introduced by them. Reverting would lose the --captured fix.
+
+R7 STILL OPEN: MULTIPART ETAG DEFECT (confirmed, not assumed)
+  verify-manifest line 186 compares the server ETag directly against the
+  local MD5:
+    etag = (s.get("etag") or "").strip('"')
+    if etag.lower() != str(l.get("md5", "")).lower():
+  For a multipart object the ETag is '<md5-of-parts>-<partcount>', which can
+  never equal the whole-object MD5. Every multipart object therefore reports
+  CHECKSUM mismatch regardless of whether the data is correct.
+
+  Line 13 of the same file states the assumption that makes the bug:
+    #   checksum   server ETag vs local MD5 (Etag == MD5 for these objects)
+  That assumption is what fails. It is not safe for objects above the
+  multipart threshold.
+
+  NOT VERIFIED, because it cannot be verified without a live server capture: echo   that the object set has no mismatches. The committed profileb manifest
+  covers the LOCAL side only.
+
+  REQUIRED TO CLOSE R7
+    1. Multipart objects are identified by the '-<partcount>' suffix and
+       compared differently (ETag parts recomputed from part digests, or
+       S3 checksum headers used instead of ETag).
+    2. NEGATIVE CONTROLS, not just a passing run: alter one object and
+       confirm a mismatch is reported; remove one object and confirm it is
+       reported missing. A verifier that passes everything is
+       indistinguishable from one that checks nothing.
+    3. A server capture that is actually retained in the repository. See
+       DEV-904-Manager-Status-Report.md correction 1: the previously
+       reported capture does not exist in the working tree or in history.
+
+  Nothing in this file asserts ST02 passes.
