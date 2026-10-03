@@ -15,7 +15,7 @@ Register summary:
 
 | ID | Subject | Status |
 |---|---|---|
-| D-001 |  public repository | Resolved 2026-10-01 |
+| D-001 | Repository held local instead of published | Resolved 2026-10-01 — repository is now public |
 | D-002 | MinIO CE image built from source | Recorded |
 | D-003 | `mc` image built from release asset | Recorded |
 | D-004 | Host below Profile B, benchmarks indicative | Recorded |
@@ -42,7 +42,7 @@ Register summary:
 
 ---
 
-## D-001 — No public repository *(RESOLVED 2026-10-01)*
+## D-001 — Repository held local instead of published *(RESOLVED 2026-10-01; repository now public)*
 
 | Field | Value |
 |---|---|
@@ -58,6 +58,13 @@ and not pushed.
 repository created" could not be satisfied. All other ST01 requirements were
 met. Version control was still in place — a normal Git repository with a
 committed history, pushable to a public host without changing content.
+
+**Register wording corrected 2026-10-03.** Commit `11831f7`, described as a
+typo fix, changed the register subject from "No public repository" to " public
+repository". That inverted the meaning rather than fixing a typo, and left a
+stray leading space. The deviation was always about holding the repository local
+against an SRD requirement to publish it; it was withdrawn on 2026-10-01 and the
+repository has been public since. The register now states that directly.
 
 **Resolution.** The requester subsequently directed strict compliance with the
 supplied SRD, which requires a public GitHub repository (SRD section 12), commits

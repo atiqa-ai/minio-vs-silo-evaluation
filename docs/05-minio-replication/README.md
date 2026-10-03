@@ -29,7 +29,7 @@ The dataset for this phase uses the reduced profile sized for two concurrent
 deployments. The measured dataset size and the parity-2 on-disk amplification are
 recorded in the environment section when the phase runs.
 
-## Required sections (SRD section 10)
+## Required sections
 
 1. Goal
 2. Environment
