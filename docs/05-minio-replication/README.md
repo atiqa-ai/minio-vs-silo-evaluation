@@ -24,7 +24,7 @@ replication, object-lock metadata replication, batch replication, site
 replication, target outage, network cut, lag measurement, resync, and two-way
 conflict behaviour.
 
-Out of scope: distributed-mode healing (`docs/04`), throughput comparison (ST04),
+Out of scope: distributed-mode healing ([`docs/04-minio-distributed-mode`](../04-minio-distributed-mode/README.md)), throughput comparison (ST04),
 Silo behaviour (ST06), and client compatibility (ST07).
 
 ## Environment

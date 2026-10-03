@@ -24,7 +24,7 @@ In scope: the same small-object, large-object, mixed, multipart,
 versioned, topology, storage, repetition, noisy-neighbour and resource-limit
 cases as ST04, executed against the Silo cluster.
 
-Out of scope: MinIO-side measurement (ST04, `docs/06`), functional behaviour
+Out of scope: MinIO-side measurement (ST04, [`docs/06-minio-performance-baseline`](../06-minio-performance-baseline/README.md)), functional behaviour
 (ST03, ST06), compatibility (ST07), and the recommendation (ST10).
 
 ## Environment

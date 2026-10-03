@@ -27,7 +27,7 @@ workloads, multipart, versioned workloads, single-node and distributed
 topologies, local storage, NFS-backed storage where available, repeated runs, a
 noisy-neighbour case, resource-limit enforcement, and raw disk `fio`.
 
-Out of scope: the Silo side of the comparison (ST08, `docs/09`), functional
+Out of scope: the Silo side of the comparison (ST08, [`docs/09-silo-performance-comparison`](../09-silo-performance-comparison/README.md)), functional
 behaviour (ST03/ST06), and the final recommendation (ST10).
 
 ## Environment

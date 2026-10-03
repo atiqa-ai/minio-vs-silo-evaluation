@@ -26,7 +26,8 @@ In scope: node failure, drive loss and wipe, parity exceedance, network
 partition, rolling restart, automatic heal, manual heal, pool expansion, pool
 decommission, rebalance, volume reattachment, and shared-volume protection.
 
-Out of scope: replication (DEV-909, tracked separately in `docs/05`), throughput
+Out of scope: replication (DEV-909, tracked separately in
+[`docs/05-minio-replication`](../05-minio-replication/README.md)), throughput
 measurement (ST04), Silo behaviour (ST06), and client compatibility (ST07).
 
 ## Environment
