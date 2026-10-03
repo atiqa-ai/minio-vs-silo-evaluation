@@ -11,6 +11,7 @@ tools/dl/
 # Vendored binaries. Each is checksum-verified at install time and the checksum
 # is recorded in the evidence, so the file itself does not belong in git.
 tools/bin/mc
+tools/bin/mcli
 tools/bin/gitleaks
 
 # Compiled/staged build inputs. The MinIO binary is ~106 MB.

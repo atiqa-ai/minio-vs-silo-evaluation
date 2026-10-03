@@ -1,0 +1,41 @@
+== client tooling provenance (DEVIATIONS.md D-023) ==
+captured: 2026-10-03T21:09:18Z
+
+-- PRIMARY CLIENT: drives BOTH products (Identical-Test Rule) --
+  binary:  tools/bin/mc
+  version: mc version RELEASE.2025-08-13T08-35-41Z (commit-id=7394ce0dd2a80935aded936b09fa12cbb3cb8096)
+  runtime: Runtime: go1.24.6 linux/amd64
+  sha256:  01f866e9c5f9b87c2b09116fa5d7c06695b106242d829a8bb32990c00312e891
+  image:   mc-local:RELEASE.2025-08-13T08-35-41Z
+  id:      sha256:80d58ab83508152a1410eefc8e7f1da25d5162140540429ee880732acfb382d2
+
+  This single client is used against MinIO AND Silo, so no difference can
+  be attributed to the client.
+
+-- SECONDARY CLIENT: mcli, used only where it is the only option --
+  binary:  tools/bin/mcli
+  version: mcli version RELEASE.2026-09-16T00-00-00Z (commit-id=e952aa78f10a2b77dd525a2b7e3143bcda0cd377)
+  detail:  Silo object storage client, based on MinIO technology
+  runtime: Runtime: go1.27.1 linux/amd64
+  sha256:  1e745aaf4684ccda198288466d122ebc5a63609247d27497a196a68511b886b8
+  source:  extracted from the pinned product image, not downloaded
+  image:   pgsty/silo:RELEASE.2026-09-16T00-00-00Z
+  digest:  pgsty/silo@sha256:635197cb9f36d01bee221d34d1c7d7960f6a95c48b0b6c01d99cd13bdae51a46
+  method:  docker create (no start) then docker cp /usr/bin/mcli; temp
+           container removed immediately after extraction
+
+-- why the image variant was settled by evidence --
+  The in-use image layer history contains:
+    COPY /go/bin/mcli /usr/bin/mcli
+    chmod +x /usr/bin/silo /usr/bin/mcli /usr/bin/docker-entrypoint.sh
+    ln -sf mcli /usr/bin/mc
+    COPY /go/bin/curl /usr/bin/curl
+  i.e. the classic variant, with a shell, curl and a client. The
+  -distroless variant ships the binary alone with no shell, so it cannot
+  support this lab's shell entrypoint or in-container client workflow.
+
+-- fairness consequence --
+  The image symlinks its own mcli AS mc. Driving Silo with mcli while
+  driving MinIO with mc would mean two different clients and would break
+  the Identical-Test Rule. That is why mc is primary for both products.
+  Behaviour that differs under mc is a DEV-912 compatibility finding.
