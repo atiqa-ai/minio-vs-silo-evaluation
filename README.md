@@ -112,6 +112,8 @@ residual risk to the conclusion.
 | Review the test data and verification | [docs/02](docs/02-test-data-and-verification/README.md) |
 | Rebuild the lab from scratch | [docs/01](docs/01-repo-versions-and-lab/README.md) §12 |
 | See every departure from the requirements | [DEVIATIONS.md](DEVIATIONS.md) |
+| Read the latest progress submission | [DEV-904-Daily-Report-2026-10-03.md](DEV-904-Daily-Report-2026-10-03.md) |
+| Read the previous consolidated status | [DEV-904-Manager-Status-Report.md](DEV-904-Manager-Status-Report.md) |
 | See the two open verification defects | [docs/02](docs/02-test-data-and-verification/README.md) — R7, R13 |
 
 ## Repository layout
@@ -121,6 +123,8 @@ residual risk to the conclusion.
 ├── README.md                     # This file: status and navigation
 ├── DEVIATIONS.md                 # Every departure from the requirements, with reasons
 ├── DEV-904-EXECUTION-PLAN.md     # Phase plan, gates, dependencies, risk register
+├── DEV-904-Manager-Status-Report.md    # Consolidated status for the project manager
+├── DEV-904-Daily-Report-2026-10-03.md # Dated daily progress submission
 ├── docs/
 │   ├── 01-repo-versions-and-lab/           # DEV-905
 │   ├── 02-test-data-and-verification/      # DEV-906

@@ -42,7 +42,9 @@
   "fixed and hardened" was inaccurate.
 - **Evidence Framework:** Deviations D-001–D-024 recorded in `DEVIATIONS.md`,
   including D-019 (execution in an Approved Controlled Reduced-Resource
-  Execution Environment), D-020 (client fairness), and D-021 (reduced dataset).
+  Execution Environment), D-020 (dataset below the Profile B floor, with reduced
+  profiles added), D-021 (benchmark parameters reduced to fit available disk), and
+  D-023 (client fairness — one client drives both products).
 - **Lab Tooling:** `fio` container built and **proven** with real measured I/O
   jobs. An NFS server builds and starts, but a client mount never completes in
   this environment, so NFS-backed storage is recorded Not Available with the
