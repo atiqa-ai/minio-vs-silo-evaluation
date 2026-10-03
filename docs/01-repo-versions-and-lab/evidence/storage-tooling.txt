@@ -76,3 +76,57 @@ SUMMARY
   The rpcbind fix removed a self-inflicted deadlock. It did NOT make the
   client mount work. NFS remains unproven end to end, and no claim to the
   contrary appears anywhere in this repository.
+
+================================================================================
+ADDENDUM - 2026-10-03T22:41Z
+================================================================================
+Added after the capture above. The capture above is NOT edited; this addendum
+records what changed and why.
+
+-- what was added --
+  lab/jobs/fio/local-seq-write.fio
+
+  The storage compose file bind-mounts ../../jobs/fio as /jobs, and the fio
+  service runs with no default command so that a job file must be named
+  explicitly. That directory was empty and untracked, so the service could not
+  actually be invoked the documented way and no job profile existed in version
+  control. There is now a tracked job file matching the parameters of the run
+  recorded at the top of this file.
+
+-- the job file was run, and the result contradicts the recorded number --
+  command:
+    docker compose -f lab/compose/storage/compose.yml run --rm fio \
+      /jobs/local-seq-write.fio
+
+  run 1:  bw=73.6MiB/s (77.2MB/s), io=64.0MiB, run=869msec
+  run 2:  bw=60.9MiB/s (63.9MB/s), io=64.0MiB, run=1051msec
+
+  Neither run is close to the bw=1560380KiB/s and runtime=42ms recorded at the
+  top of this file. The captured output did not record the block size, so the
+  original run cannot be reconstructed exactly, and the job file does not claim
+  to reproduce it.
+
+  All fio throughput figures now known on this host:
+      1,560,380 KiB/s    the original captured run
+        167,183 KiB/s    bind-mount target
+         64,377 KiB/s    container target
+         62,400 KiB/s    job file, run 1
+         60,900 KiB/s    job file, run 2
+
+-- why this changes the status of the fio result --
+  Run 1 and run 2 are the same job file, the same target and the same host,
+  minutes apart, and they differ by 22%. Across targets the spread is about 25x.
+
+  A figure that moves 22% with nothing changed, and 25x when the target changes,
+  is not a measurement of storage capability. It is dominated by the target
+  filesystem and by whatever else the host is doing.
+
+  The status at the top of this file ("fio BUILT AND PROVEN. A real I/O job ran
+  and reported measurements.") remains TRUE and is not withdrawn: the job does
+  run, the tool does work, and 64 MiB is written and read back. What is corrected
+  is the implied claim that the number is meaningful. It is a CAPABILITY CHECK -
+  fio can drive a real I/O job here - and no fio throughput figure from this host
+  may be presented as a benchmark, quoted in the performance baseline, or
+  compared between products.
+
+  Raw output of run 2 is in evidence/fio-local-seq-write.txt.

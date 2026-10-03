@@ -1,0 +1,52 @@
+# Local sequential write — storage capability check.
+#
+# This job exists to answer one question: can fio drive a real I/O job against
+# the directory the object-storage clusters sit on? It is NOT a benchmark of
+# MinIO or Silo and no result from it may be attributed to either product.
+#
+# The parameters match the run captured in
+# docs/01-repo-versions-and-lab/evidence/storage-tooling.txt:
+#
+#   io_bytes=67108864  bw=1560380KiB/s  runtime=42ms
+#
+# i.e. 64 MiB of sequential write, direct=1, libaio at iodepth 8. The captured
+# output did not record the block size, so this job cannot reproduce that run
+# exactly and does not claim to; bs=1M is chosen here and stated.
+#
+# WHY THESE EXACT PARAMETERS ARE PINNED HERE
+# ------------------------------------------
+# fio throughput on this host is not reproducible. Measured figures:
+#
+#   1,560,380 KiB/s   the run captured in storage-tooling.txt
+#     167,183 KiB/s   bind-mount target
+#      64,377 KiB/s   container target
+#      62,400 KiB/s   this job file, first run  (73.6 MiB/s, 869 ms)
+#      60,900 KiB/s   this job file, second run (60.9 MiB/s, 1051 ms)
+#
+# Two things follow. Across targets the spread is about 25x, so the target
+# filesystem dominates the number. And the last two rows are the SAME job file,
+# SAME target, run back to back minutes apart, differing by 22% — so the number
+# does not even repeat under fixed conditions.
+#
+# The parameters are therefore frozen rather than tuned. A tuned job file would
+# invite the next person to adjust it until the number looks presentable, which
+# is how a capability check turns into a fabricated benchmark. Change the job
+# only alongside a recorded explanation of what the previous numbers meant.
+#
+# Size is deliberately small (64 MiB). At ~42 ms runtime this job verifies that
+# the tool works end to end. It is not long enough to saturate anything, and it
+# is not intended to.
+
+[seqwrite]
+ioengine=libaio
+direct=1
+iodepth=8
+rw=write
+bs=1M
+size=64M
+filename_format=/data/$jobname
+directory=/data
+group_reporting=1
+
+# Strip per-iteration stats so the output stays stable across runs and diffable.
+# The aggregate bandwidth line is the whole point of this job.

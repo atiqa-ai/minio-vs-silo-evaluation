@@ -1,0 +1,34 @@
+# fio local-seq-write job - capability check
+# captured: 2026-10-03T22:40:35Z
+# command: docker compose -f lab/compose/storage/compose.yml run --rm fio /jobs/local-seq-write.fio
+
+seqwrite: (g=0): rw=write, bs=(R) 1024KiB-1024KiB, (W) 1024KiB-1024KiB, (T) 1024KiB-1024KiB, ioengine=libaio, iodepth=8
+fio-3.41
+Starting 1 process
+
+seqwrite: (groupid=0, jobs=1): err= 0: pid=12: Sat Oct  3 22:40:39 2026
+  write: IOPS=60, BW=60.9MiB/s (63.9MB/s)(64.0MiB/1051msec); 0 zone resets
+    slat (usec): min=113, max=85601, avg=14099.54, stdev=13693.03
+    clat (msec): min=17, max=215, avg=112.65, stdev=53.97
+     lat (msec): min=22, max=231, avg=126.75, stdev=58.51
+    clat percentiles (msec):
+     |  1.00th=[   18],  5.00th=[   24], 10.00th=[   37], 20.00th=[   53],
+     | 30.00th=[   72], 40.00th=[  105], 50.00th=[  128], 60.00th=[  146],
+     | 70.00th=[  150], 80.00th=[  161], 90.00th=[  178], 95.00th=[  184],
+     | 99.00th=[  215], 99.50th=[  215], 99.90th=[  215], 99.95th=[  215],
+     | 99.99th=[  215]
+   bw (  KiB/s): min=38679, max=64631, per=82.84%, avg=51655.00, stdev=18350.84, samples=2
+   iops        : min=   37, max=   63, avg=50.00, stdev=18.38, samples=2
+  lat (msec)   : 20=1.56%, 50=17.19%, 100=20.31%, 250=60.94%
+  cpu          : usr=0.76%, sys=48.57%, ctx=59, majf=0, minf=8
+  IO depths    : 1=1.6%, 2=3.1%, 4=6.2%, 8=89.1%, 16=0.0%, 32=0.0%, >=64=0.0%
+     submit    : 0=0.0%, 4=100.0%, 8=0.0%, 16=0.0%, 32=0.0%, 64=0.0%, >=64=0.0%
+     complete  : 0=0.0%, 4=98.3%, 8=1.7%, 16=0.0%, 32=0.0%, 64=0.0%, >=64=0.0%
+     issued rwts: total=0,64,0,0 short=0,0,0,0 dropped=0,0,0,0
+     latency   : target=0, window=0, percentile=100.00%, depth=8
+
+Run status group 0 (all jobs):
+  WRITE: bw=60.9MiB/s (63.9MB/s), 60.9MiB/s-60.9MiB/s (63.9MB/s-63.9MB/s), io=64.0MiB (67.1MB), run=1051-1051msec
+
+Disk stats (read/write):
+  sda: ios=0/91, sectors=0/92160, merge=0/0, ticks=0/7700, in_queue=7767, util=63.55%
